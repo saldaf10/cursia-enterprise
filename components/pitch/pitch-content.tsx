@@ -280,12 +280,12 @@ export const PLANS_SLIDE = {
           <div className="space-y-6 flex-grow flex flex-col justify-between">
             <div className="text-center py-8 bg-gray-50 rounded-2xl border border-gray-100">
               <p className="text-sm text-gray-400 font-medium uppercase tracking-wide mb-1">Antes</p>
-              <p className="text-xl text-gray-400 line-through font-medium mb-2">$1,198 USD</p>
+              <p className="text-xl text-gray-400 line-through font-medium mb-2">$899 USD</p>
               <div className="w-16 h-0.5 bg-gray-200 mx-auto mb-4"></div>
 
               <p className="text-lg text-gray-900 font-bold uppercase tracking-wide mb-0">Ahora</p>
               <div className="flex items-baseline justify-center gap-2">
-                <span className="text-5xl font-black text-gray-900">599</span>
+                <span className="text-5xl font-black text-gray-900">449</span>
                 <span className="text-lg text-gray-500 font-medium">USD</span>
               </div>
             </div>
@@ -322,12 +322,12 @@ export const PLANS_SLIDE = {
           <div className="space-y-6 flex-grow flex flex-col justify-between">
             <div className="text-center py-6 bg-blue-50/50 rounded-2xl border border-blue-100">
               <p className="text-sm text-gray-400 font-medium uppercase tracking-wide mb-1">Precio Regular</p>
-              <p className="text-xl text-gray-400 line-through font-medium mb-2">$2,798 USD</p>
+              <p className="text-xl text-gray-400 line-through font-medium mb-2">$2,099 USD</p>
               <div className="w-16 h-0.5 bg-blue-200 mx-auto mb-4"></div>
 
               <p className="text-lg text-cursia-blue font-bold uppercase tracking-wide mb-0">Oferta Limitada</p>
               <div className="flex items-baseline justify-center gap-2">
-                <span className="text-6xl font-black text-cursia-blue">1,399</span>
+                <span className="text-6xl font-black text-cursia-blue">1,049</span>
                 <span className="text-lg text-gray-500 font-medium">USD</span>
               </div>
             </div>
@@ -362,12 +362,12 @@ export const PLANS_SLIDE = {
           <div className="space-y-6 flex-grow flex flex-col justify-between">
             <div className="text-center py-6 bg-blue-50/30 rounded-2xl border border-blue-100">
               <p className="text-sm text-gray-400 font-medium uppercase tracking-wide mb-1">Precio de Lista</p>
-              <p className="text-xl text-gray-400 line-through font-medium mb-2">$5,598 USD</p>
+              <p className="text-xl text-gray-400 line-through font-medium mb-2">$4,199 USD</p>
               <div className="w-16 h-0.5 bg-blue-200 mx-auto mb-4"></div>
 
               <p className="text-lg text-gray-900 font-bold uppercase tracking-wide mb-0">Precio Especial</p>
               <div className="flex items-baseline justify-center gap-2">
-                <span className="text-5xl font-black text-cursia-blue">2,799</span>
+                <span className="text-5xl font-black text-cursia-blue">2,099</span>
                 <span className="text-lg text-gray-500 font-medium">USD</span>
               </div>
             </div>
