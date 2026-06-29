@@ -1,646 +1,669 @@
 "use client";
 
-import React, { useState } from "react";
+/**
+ * Cursia — Landing premium (producción, ruta /)
+ * Claro premium coherente con el interior de la app:
+ * blanco + azul #0066FF primario + violeta #7C3AED acento + verde validación.
+ * Funnel: atención → consideración → prueba social → conversión.
+ * La landing anterior quedó archivada en /anterior.
+ *
+ * NOTA: las reseñas son PLACEHOLDERS EDITABLES. Reemplazar por testimonios reales.
+ */
+
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
-  ShieldCheck,
   ArrowRight,
-  LogIn,
-  Instagram,
-  Sparkles,
-  BookOpen,
-  PieChart,
-  Building2,
-  Briefcase,
-  User,
-  Mail,
-  Smartphone,
-  Send,
-  Users,
+  ArrowUpRight,
+  ArrowLeft,
   CheckCircle2,
-  Brain,
-  BarChart2,
-  Calendar,
   Check,
-  Cpu,
+  Quote,
+  Sparkles,
+  Star,
 } from "lucide-react";
+import { SERVICES, tone, WHATSAPP_URL } from "./services";
+import WhatsappFab from "./_components/WhatsappFab";
 
-export default function Home() {
-  const [formData, setFormData] = useState({
-    nombre: "",
-    celular: "",
-    correo: "",
-    empresa: "",
-  });
-  const [formSubmitted, setFormSubmitted] = useState(false);
-  const [formSubmitting, setFormSubmitting] = useState(false);
-  const [showWhatsAppButton, setShowWhatsAppButton] = useState(false);
-  const [panelZoomed, setPanelZoomed] = useState(false);
+/* ── Scroll reveal ────────────────────────────────────────────────────────── */
+function useScrollReveal() {
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) {
+      els.forEach((el) => el.classList.add("is-visible"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            (e.target as HTMLElement).classList.add("is-visible");
+            io.unobserve(e.target);
+          }
+        });
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -8% 0px" }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+}
 
-  React.useEffect(() => {
-    const t = setTimeout(() => setShowWhatsAppButton(true), 1000);
-    return () => clearTimeout(t);
+/* ── Spotlight de cursor en cards ─────────────────────────────────────────── */
+function onCardMouseMove(e: React.MouseEvent<HTMLElement>) {
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  el.style.setProperty("--cx", `${e.clientX - r.left}px`);
+  el.style.setProperty("--cy", `${e.clientY - r.top}px`);
+}
+
+/* ── Reseñas — PLACEHOLDERS EDITABLES ─────────────────────────────────────── */
+const REVIEWS = [
+  { quote: "El reporte nos mostró exactamente dónde estaba el vacío de conocimiento. Capacitamos con foco y el cambio fue medible en semanas.", role: "Dirección de Talento Humano", org: "Sector financiero" },
+  { quote: "Por fin un curso que no se puede 'pasar' copiando. Las preguntas abiertas con IA nos dieron una certificación en la que confiamos.", role: "Jefatura de Operaciones", org: "Manufactura" },
+  { quote: "El agente sobre nuestros manuales le ahorra horas al equipo cada semana. Responde al instante y siempre cita la fuente.", role: "Líder de L&D", org: "Retail" },
+  { quote: "La nueva página web cambió por completo cómo nos perciben los clientes. Se siente premium y carga al instante.", role: "Gerencia de Marketing", org: "Servicios B2B" },
+  { quote: "La auditoría de procesos destapó cuellos de botella que llevábamos años arrastrando. El plan fue claro y accionable.", role: "Dirección de Operaciones", org: "Logística" },
+  { quote: "Montaron mi funnel y mis cursos llave en mano. Pasé de improvisar a tener una marca que vende sola.", role: "Creador de contenido", org: "Educación online" },
+] as const;
+
+/* ── Nodos de la constelación del hero (5 servicios alrededor del núcleo) ──── */
+const NODE_LABELS = ["Web premium", "Cursos IA", "Auditoría", "Funnels", "Software"];
+const NODES = SERVICES.map((s, k) => {
+  const ang = ((-90 + k * 72) * Math.PI) / 180;
+  const R = 37; // radio en %
+  return {
+    label: NODE_LABELS[k] ?? s.title,
+    icon: s.icon,
+    tone: s.tone,
+    x: +(50 + R * Math.cos(ang)).toFixed(2),
+    y: +(50 + R * Math.sin(ang)).toFixed(2),
+  };
+});
+
+/* ════════════════════════════════════════════════════════════════════════ */
+
+export default function ReinventionLanding() {
+  useScrollReveal();
+  const [scrolled, setScrolled] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const reviewsRail = useRef<HTMLDivElement>(null);
+
+  // Coverflow 3D de servicios (manual, giratorio infinito)
+  const [activeSvc, setActiveSvc] = useState(0);
+  const goSvc = useCallback(
+    (dir: number) => setActiveSvc((a) => (a + dir + SERVICES.length) % SERVICES.length),
+    []
+  );
+  const svcDrag = useRef<{ x: number; active: boolean }>({ x: 0, active: false });
+  const onSvcPointerDown = useCallback((e: React.PointerEvent) => {
+    svcDrag.current = { x: e.clientX, active: true };
+  }, []);
+  const onSvcPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!svcDrag.current.active) return;
+    svcDrag.current.active = false;
+    const dx = e.clientX - svcDrag.current.x;
+    // Arrastre (swipe)
+    if (Math.abs(dx) > 45) { goSvc(dx > 0 ? -1 : 1); return; }
+    // Clic simple: según la mitad donde se hizo clic
+    const rect = e.currentTarget.getBoundingClientRect();
+    const rel = e.clientX - (rect.left + rect.width / 2);
+    if (rel > 175) goSvc(1);
+    else if (rel < -175) goSvc(-1);
+    // Zona central (tarjeta activa): no mueve, deja navegar el botón
+  }, [goSvc]);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmitLead = async () => {
-    if (!isFormValid || formSubmitting) return;
-    setFormSubmitting(true);
-    try {
-      await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+  // Parallax del hero
+  useEffect(() => {
+    const hero = heroRef.current;
+    if (!hero || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const onMove = (e: MouseEvent) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const r = hero.getBoundingClientRect();
+        hero.style.setProperty("--px", ((e.clientX - r.left) / r.width - 0.5).toFixed(3));
+        hero.style.setProperty("--py", ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
       });
-      setFormSubmitted(true);
-    } catch (error) {
-      console.error("Error al guardar lead:", error);
-    } finally {
-      setFormSubmitting(false);
-    }
-  };
+    };
+    hero.addEventListener("mousemove", onMove);
+    return () => { hero.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
+  }, []);
 
-  const isFormValid =
-    formData.nombre &&
-    formData.celular &&
-    formData.correo &&
-    formData.empresa;
+  const slide = useCallback((ref: React.RefObject<HTMLDivElement | null>, dir: number) => {
+    const rail = ref.current;
+    if (!rail) return;
+    rail.scrollBy({ left: dir * (rail.clientWidth * 0.8), behavior: "smooth" });
+  }, []);
 
   return (
-    <div className="min-h-screen bg-cursia-surface text-cursia-on-surface selection:bg-blue-100 selection:text-blue-900 font-body">
+    <div className="cursia-root min-h-screen bg-white text-[#191C1E] antialiased font-body selection:bg-[#0066FF]/15 selection:text-[#0066FF] overflow-x-hidden">
+      <StyleBlock />
+      <WhatsappFab />
 
-      {/* ── Floating Pill Navbar ── */}
-      <nav className="fixed top-6 left-1/2 -translate-x-1/2 w-[90%] max-w-7xl z-[100] bg-white/70 backdrop-blur-xl border border-white/40 shadow-[0_20px_50px_-15px_rgba(0,102,255,0.1)] rounded-full">
-        <div className="flex justify-between items-center px-8 py-3 mx-auto">
-          <div className="text-2xl font-extrabold tracking-tighter font-headline hover:scale-105 transition-transform cursor-pointer">
-            <span className="text-slate-900">Curs</span><span className="text-cursia-blue">ia</span>
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0">
+        <div className="aura aura--blue" />
+        <div className="aura aura--violet" />
+        <div className="grid-faint" />
+      </div>
+
+      {/* ── Navbar ── */}
+      <header className="fixed top-4 inset-x-0 z-50 flex justify-center px-4">
+        <nav className={`flex items-center gap-2 sm:gap-6 rounded-full border px-4 sm:px-6 py-2.5 transition-all duration-500 ${
+          scrolled ? "border-black/5 bg-white/80 backdrop-blur-xl shadow-[0_10px_40px_-18px_rgba(2,12,40,0.35)]" : "border-black/[0.04] bg-white/50 backdrop-blur-md"
+        }`}>
+          <span className="font-headline font-extrabold text-lg tracking-tight">Curs<span className="text-[#0066FF]">ia</span></span>
+          <div className="hidden md:flex items-center gap-6 text-sm text-[#424656]">
+            <a href="#servicios" className="hover:text-[#0066FF] transition-colors">Servicios</a>
+            <a href="#proceso" className="hover:text-[#0066FF] transition-colors">Proceso</a>
+            <a href="#resenas" className="hover:text-[#0066FF] transition-colors">Reseñas</a>
           </div>
+          <a href="#contacto" className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-[#0066FF] px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(0,102,255,0.7)] hover:bg-[#0052cc] transition-all">
+            Hablemos <ArrowRight className="w-4 h-4" />
+          </a>
+        </nav>
+      </header>
 
-          <div className="hidden md:flex items-center gap-10">
-            {[
-              { label: "Administración", href: "#admin" },
-              { label: "Tecnología IA", href: "#ai" },
-              { label: "Contacto", href: "#contacto" },
-            ].map(({ label, href }) => (
-              <a
-                key={href}
-                href={href}
-                className="relative font-headline font-semibold text-sm tracking-tight text-slate-600 hover:text-cursia-blue transition-colors group"
-              >
-                {label}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-cursia-blue transition-all duration-300 group-hover:w-full" />
+      {/* ── HERO ── */}
+      <section ref={heroRef} className="hero relative z-10 min-h-[100svh] flex items-center px-6 pt-32 pb-20 overflow-hidden">
+        <MouseField />
+        <div className="relative z-10 max-w-6xl mx-auto w-full grid lg:grid-cols-[1.05fr_0.95fr] gap-12 lg:gap-16 items-center">
+          <div>
+            <div data-reveal className="reveal inline-flex items-center gap-2 rounded-full border border-black/[0.06] bg-[#F7F9FB] px-4 py-1.5 text-xs font-semibold text-[#424656]">
+              <CheckCircle2 className="w-4 h-4 text-[#006C49]" /> Resultados verificables con IA
+            </div>
+            <h1 data-reveal className="reveal reveal--1 font-headline font-extrabold tracking-tight mt-6 text-[clamp(2.5rem,6.5vw,5rem)] leading-[1.06]">
+              <span className="block">La inteligencia que</span>
+              <span className="grad-text">construye tu futuro digital.</span>
+            </h1>
+            <p data-reveal className="reveal reveal--2 mt-6 max-w-xl text-base sm:text-lg text-[#424656] leading-relaxed">
+              Web premium, agentes de búsqueda sobre tus documentos, cursos con IA,
+              auditoría de procesos y funnels para creadores. Todo con una sola firma:
+              <span className="text-[#191C1E] font-semibold"> evidencia, no promesas.</span>
+            </p>
+            <div data-reveal className="reveal reveal--3 mt-9 flex flex-col sm:flex-row gap-4">
+              <a href="#contacto" className="group inline-flex items-center justify-center gap-2 rounded-full bg-[#0066FF] px-7 py-3.5 text-base font-semibold text-white shadow-[0_16px_40px_-12px_rgba(0,102,255,0.8)] hover:bg-[#0052cc] transition-all">
+                Solicitar diagnóstico gratis <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </a>
-            ))}
+              <a href="#servicios" className="inline-flex items-center justify-center gap-2 rounded-full border border-black/[0.08] bg-white px-7 py-3.5 text-base font-medium text-[#191C1E] hover:border-[#0066FF]/40 hover:text-[#0066FF] transition-all">
+                Ver servicios
+              </a>
+            </div>
+            <div data-reveal className="reveal reveal--4 mt-10 flex items-center gap-6 text-sm text-[#424656]">
+              <div className="flex items-center gap-1.5">
+                {[0, 1, 2, 3, 4].map((i) => <Star key={i} className="w-4 h-4 fill-[#7C3AED] text-[#7C3AED]" />)}
+              </div>
+              <span>Equipos que aprenden <span className="font-semibold text-[#191C1E]">de verdad</span></span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <Link
-              href="/auth/signin"
-              className="font-headline font-semibold text-sm text-slate-600 hover:text-cursia-blue transition-all duration-300"
-            >
-              Acceder
-            </Link>
-            <a
-              href="#contacto"
-              className="bg-cursia-blue text-white px-7 py-2.5 rounded-full font-headline font-bold text-sm tracking-tight hover:bg-blue-700 hover:shadow-[0_10px_25px_-5px_rgba(0,80,203,0.4)] hover:-translate-y-0.5 active:scale-95 transform transition-all shadow-lg shadow-blue-500/20"
-            >
-              Evaluación Gratis
-            </a>
-          </div>
-        </div>
-      </nav>
+          {/* Constelación de capacidades (reacciona al mouse vía parallax) */}
+          <div data-reveal className="reveal reveal--3 relative">
+            <div className="gradient-ring parallax-card rounded-[2.1rem] p-px">
+              <div className="constellation relative aspect-square overflow-hidden rounded-[2rem] bg-white shadow-[0_40px_120px_-40px_rgba(2,12,40,0.35)]">
+                {/* fondo sutil */}
+                <div aria-hidden className="absolute inset-0" style={{ background: "radial-gradient(70% 60% at 50% 46%, rgba(124,58,237,0.08), transparent 70%)" }} />
+                <div aria-hidden className="grid-faint opacity-50" />
 
-      <main className="pt-32 overflow-hidden">
+                {/* anillos giratorios */}
+                <div aria-hidden className="orbit-ring absolute left-1/2 top-1/2 h-[80%] w-[80%] rounded-full border border-dashed border-black/[0.07]" />
+                <div aria-hidden className="orbit-ring-rev absolute left-1/2 top-1/2 h-[54%] w-[54%] rounded-full border border-black/[0.05]" />
 
-        {/* ── Hero Section ── */}
-        <section className="relative px-8 py-20 lg:py-32">
-          {/* Background blobs */}
-          <div className="absolute top-0 -left-20 w-[600px] h-[600px] bg-cursia-blue/10 rounded-full blur-[140px] -z-10 animate-pulse" />
-          <div className="absolute bottom-0 -right-20 w-[500px] h-[500px] bg-purple-500/5 rounded-full blur-[140px] -z-10" />
+                {/* líneas conectoras */}
+                <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
+                  <defs>
+                    <linearGradient id="cline" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#0066FF" stopOpacity="0.55" />
+                      <stop offset="100%" stopColor="#7C3AED" stopOpacity="0.12" />
+                    </linearGradient>
+                  </defs>
+                  {NODES.map((n) => (
+                    <line key={n.label} x1="50" y1="50" x2={n.x} y2={n.y} stroke="url(#cline)" strokeWidth={1.4} vectorEffect="non-scaling-stroke" strokeDasharray="3 4" className="cline" />
+                  ))}
+                </svg>
 
-          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                {/* nodos de servicios */}
+                {NODES.map((n, idx) => {
+                  const tt = tone[n.tone]; const NIcon = n.icon;
+                  return (
+                    <div key={n.label} className="node absolute" style={{ left: `${n.x}%`, top: `${n.y}%`, animationDelay: `${idx * 0.45}s` }}>
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white ring-1 ring-black/[0.06] shadow-[0_14px_30px_-12px_rgba(2,12,40,0.45)]" style={{ color: tt.c }}>
+                          <NIcon className="h-5 w-5" />
+                        </span>
+                        <span className="rounded-md bg-white/85 px-1.5 text-[11px] font-semibold text-[#191C1E] backdrop-blur-sm">{n.label}</span>
+                      </div>
+                    </div>
+                  );
+                })}
 
-            {/* Left: text */}
-            <div className="relative z-10 space-y-10">
-              {/* Badge */}
-              <div className="inline-flex items-center gap-2 px-5 py-2 bg-cursia-green/10 text-cursia-green rounded-full font-body font-bold text-xs uppercase tracking-widest border border-cursia-green/20">
-                <ShieldCheck className="w-4 h-4" />
-                Integridad de Datos Garantizada
-              </div>
-
-              {/* H1 */}
-              <h1 className="text-6xl lg:text-[5.5rem] font-[800] leading-[1.05] tracking-[-0.05em] text-cursia-on-surface font-headline">
-                Evalúe a su{" "}
-                <span className="bg-gradient-to-r from-cursia-blue to-blue-400 bg-clip-text text-transparent">
-                  Equipo
-                </span>{" "}
-                Gratis.
-              </h1>
-
-              {/* Paragraph */}
-              <p className="text-xl text-cursia-on-surface-dim max-w-lg font-body leading-relaxed">
-                Desbloqueamos el potencial real de su organización con evaluaciones impulsadas por IA, diseñadas para identificar problemas con precisión.
-              </p>
-
-              {/* CTAs */}
-              <div className="flex flex-col sm:flex-row gap-5">
-                <a
-                  href="#contacto"
-                  className="px-10 py-5 bg-cursia-blue text-white rounded-[1.5rem] font-headline font-bold text-lg hover:shadow-[0_25px_50px_-12px_rgba(0,102,255,0.3)] transition-all flex items-center justify-center gap-2 active:scale-95 transform"
-                >
-                  Solicitar Diagnóstico
-                  <ArrowRight className="w-5 h-5" />
-                </a>
-              </div>
-
-              {/* Quick Stats */}
-              <div className="flex items-center gap-8 pt-4 border-t border-slate-200/60">
-                <div className="flex flex-col">
-                  <span className="text-2xl font-black text-cursia-on-surface tracking-tighter">Gratis</span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sin compromisos</span>
-                </div>
-                <div className="w-px h-10 bg-slate-200" />
-                <div className="flex flex-col">
-                  <span className="text-2xl font-black text-cursia-on-surface tracking-tighter">Récord</span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tiempos de entrega</span>
+                {/* núcleo */}
+                <div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2">
+                  <span aria-hidden className="core-ping absolute inset-0 rounded-full" />
+                  <div className="relative flex h-24 w-24 flex-col items-center justify-center rounded-full text-white ring-4 ring-white shadow-[0_22px_55px_-12px_rgba(0,102,255,0.65)]" style={{ background: "conic-gradient(from 140deg, #0066FF, #7C3AED, #4F7DFF, #0066FF)" }}>
+                    <span className="font-headline text-lg font-extrabold leading-none">Cursia</span>
+                    <span className="mt-0.5 text-[9px] font-medium opacity-80">núcleo IA</span>
+                  </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Right: 3-step process card */}
-            <div className="relative">
-              {/* Glow */}
-              <div className="absolute inset-0 bg-cursia-blue/10 rounded-[3rem] blur-3xl -z-10" />
+      {/* ── Marquee de capacidades ── */}
+      <div className="relative z-10 border-y border-black/[0.05] bg-white/60 backdrop-blur-sm py-4 overflow-hidden">
+        <div className="marquee flex gap-8 whitespace-nowrap text-sm font-semibold uppercase tracking-[0.18em] text-[#424656]">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <span key={i} className="flex gap-8">
+              {["Diseño cinematográfico", "Evaluación con IA", "Detección de fraude", "Auditoría de procesos", "Funnels de conversión", "Web premium", "Cursos a medida", "Reportes estratégicos"].map((t) => (
+                <span key={t} className="flex items-center gap-2.5"><Sparkles className="w-3.5 h-3.5 text-[#7C3AED]" /> {t}</span>
+              ))}
+            </span>
+          ))}
+        </div>
+      </div>
 
-              <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-200/60 p-8 md:p-10">
+      {/* ── SERVICIOS (slider de tarjetas oscuras) ── */}
+      <section id="servicios" className="relative z-10 px-6 py-20 sm:py-24">
+        <div className="max-w-6xl mx-auto">
+          <div data-reveal className="reveal flex flex-wrap items-end justify-between gap-6">
+            <div className="max-w-2xl">
+              <span className="text-xs font-bold uppercase tracking-[0.25em] text-[#7C3AED]">Servicios</span>
+              <h2 className="font-headline font-extrabold tracking-tight mt-4 text-[clamp(2rem,5vw,3.4rem)] leading-[1.05]">
+                Cinco formas de llevar tu operación <span className="grad-text">al siguiente nivel.</span>
+              </h2>
+            </div>
+          </div>
 
-                {/* Header */}
-                <div className="mb-8">
-                  <div className="text-[10px] font-bold text-cursia-blue uppercase tracking-[0.25em] mb-2">Evaluación Gratuita</div>
-                  <div className="text-2xl font-extrabold font-headline text-cursia-on-surface">Así de simple.</div>
-                </div>
+          <div className="svc3d mt-14 select-none">
+            <div
+              className="relative mx-auto h-[500px]"
+              style={{ perspective: "2000px" }}
+              onPointerDown={onSvcPointerDown}
+              onPointerUp={onSvcPointerUp}
+              onPointerLeave={onSvcPointerUp}
+            >
+              <div className="absolute inset-0" style={{ transformStyle: "preserve-3d" }}>
+                {SERVICES.map((s, i) => {
+                  const t = tone[s.tone]; const Icon = s.icon;
+                  let d = i - activeSvc;
+                  if (d > SERVICES.length / 2) d -= SERVICES.length;
+                  if (d < -SERVICES.length / 2) d += SERVICES.length;
+                  const ad = Math.abs(d);
+                  const isActive = d === 0;
+                  const hidden = ad > 2;
+                  return (
+                    <div
+                      key={s.slug}
+                      onMouseMove={onCardMouseMove}
+                      className={`svc-card spotlight-card group absolute left-1/2 top-0 flex h-[480px] w-[330px] flex-col overflow-hidden rounded-[26px] border ${isActive ? "cursor-default" : "cursor-pointer"}`}
+                      style={{
+                        background: `radial-gradient(130% 90% at 100% 0%, ${t.tint}, transparent 50%), linear-gradient(168deg, #070B15 0%, #03050B 100%)`,
+                        ["--spot" as string]: t.soft,
+                        ["--glow" as string]: t.soft,
+                        transform: `translateX(-50%) translateX(${d * 236}px) translateZ(${-ad * 240}px) rotateY(${-d * 27}deg) scale(${1 - ad * 0.05})`,
+                        zIndex: 50 - ad,
+                        opacity: hidden ? 0 : 1 - ad * 0.12,
+                        pointerEvents: hidden ? "none" : "auto",
+                        borderColor: isActive ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)",
+                        boxShadow: isActive ? `0 60px 130px -50px ${t.soft}` : "0 40px 90px -55px rgba(0,0,0,0.75)",
+                        transition: "transform .65s cubic-bezier(.16,1,.3,1), opacity .55s ease, box-shadow .55s ease, border-color .55s ease",
+                      }}
+                    >
+                      {/* spine de color superior */}
+                      <div aria-hidden className="svc-spine absolute inset-x-0 top-0 h-[3px]" style={{ background: `linear-gradient(90deg, transparent, ${t.c}, ${t.c2}, transparent)`, backgroundSize: "200% 100%" }} />
+                      {/* número fantasma */}
+                      <span aria-hidden className="absolute right-5 top-3 font-headline text-[76px] font-black leading-none text-white/[0.05] select-none">{s.n}</span>
+                      {/* icono marca de agua */}
+                      <Icon aria-hidden className="absolute -right-7 -bottom-7 h-44 w-44 text-white/[0.03]" strokeWidth={1.25} />
+                      {/* glow de color tras el icono */}
+                      <div aria-hidden className="svc-glow absolute -left-12 -top-12 h-44 w-44 rounded-full blur-[60px]" style={{ background: t.soft }} />
 
-                {/* Steps timeline */}
-                <div className="relative">
-                  {/* Vertical line */}
-                  <div className="absolute left-[1.375rem] top-11 bottom-11 w-0.5 bg-gradient-to-b from-cursia-blue/40 via-cursia-blue/20 to-cursia-blue/60 z-0" />
-
-                  <div className="space-y-3 relative z-10">
-                    {[
-                      {
-                        num: "01",
-                        icon: <Brain className="w-5 h-5" />,
-                        title: "Análisis del tema",
-                        tag: "Nosotros lo diseñamos",
-                        active: false,
-                      },
-                      {
-                        num: "02",
-                        icon: <Users className="w-5 h-5" />,
-                        title: "Su equipo responde",
-                        tag: "Preguntas abiertas · Sin trampas",
-                        active: false,
-                      },
-                      {
-                        num: "03",
-                        icon: <BarChart2 className="w-5 h-5" />,
-                        title: "Reporte estratégico",
-                        tag: "Brechas + recomendaciones",
-                        active: true,
-                      },
-                    ].map(({ num, icon, title, tag, active }) => (
-                      <div key={num} className="flex items-center gap-4 group">
-                        {/* Icon node */}
-                        <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-white shrink-0 shadow-md transition-transform duration-300 group-hover:scale-110 ${active ? "bg-cursia-blue shadow-blue-500/30" : "bg-cursia-blue/70"}`}>
-                          {icon}
+                      <div className="relative flex flex-1 flex-col p-6">
+                        {/* chip de icono */}
+                        <div
+                          className="flex shrink-0 items-center justify-center rounded-2xl text-white ring-1 ring-white/15 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3"
+                          style={{ height: 52, width: 52, background: `linear-gradient(135deg, ${t.c}, ${t.c2})`, boxShadow: `0 16px 34px -10px ${t.soft}` }}
+                        >
+                          <Icon className="w-6 h-6" />
                         </div>
-                        {/* Content */}
-                        <div className={`flex-1 flex items-center justify-between p-4 rounded-2xl border transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-md ${active ? "bg-cursia-blue/5 border-cursia-blue/25" : "bg-cursia-surface border-slate-100"}`}>
-                          <div>
-                            <p className="font-bold text-cursia-on-surface">{title}</p>
-                            <p className={`text-xs font-semibold ${active ? "text-cursia-blue" : "text-slate-400"}`}>{tag}</p>
-                          </div>
-                          <div className="text-[11px] font-black text-slate-200 font-headline pl-3">{num}</div>
+
+                        <span className="mt-5 block text-[10.5px] font-bold uppercase tracking-[0.22em]" style={{ color: t.c2 }}>{s.category}</span>
+                        <h3 className="font-headline text-[20px] font-extrabold text-white mt-1.5 leading-[1.15]">{s.title}</h3>
+                        <p className="mt-2.5 text-[13px] text-slate-400 leading-relaxed">{s.lead}</p>
+
+                        <div aria-hidden className="my-4 h-px w-full bg-white/[0.08]" />
+
+                        <ul className="space-y-2.5">
+                          {s.includes.slice(0, 3).map((b) => (
+                            <li key={b} className="flex items-center gap-2.5 text-[12.5px] text-slate-300">
+                              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full" style={{ background: t.tint }}>
+                                <Check className="h-2.5 w-2.5" style={{ color: t.c2 }} strokeWidth={3} />
+                              </span>
+                              {b}
+                            </li>
+                          ))}
+                        </ul>
+
+                        {/* botón / CTA */}
+                        <div className="relative mt-auto pt-5">
+                          {isActive ? (
+                            <Link href={`/servicios/${s.slug}`} className="relative block overflow-hidden rounded-xl">
+                              <span aria-hidden className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: `linear-gradient(135deg, ${t.c}, ${t.c2})` }} />
+                              <span className="relative flex items-center justify-between rounded-xl border border-white/15 px-4 py-3 text-[13px] font-semibold text-white transition-colors duration-300 group-hover:border-transparent">
+                                Conocer servicio
+                                <ArrowUpRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                              </span>
+                            </Link>
+                          ) : (
+                            <span className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-[13px] font-semibold text-white/60">
+                              Conocer servicio
+                              <ArrowUpRight className="w-4 h-4" />
+                            </span>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="mt-6 pt-5 border-t border-slate-100 flex items-center gap-2 text-xs font-bold text-cursia-green">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  Sin costo · Sin compromisos · Tiempo récord
-                </div>
-
-              </div>
-
-              {/* Floating badge */}
-              <div className="absolute -bottom-5 -right-5 glass-panel p-5 rounded-2xl shadow-xl border border-white animate-float z-20">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-cursia-blue rounded-xl flex items-center justify-center text-white">
-                    <Brain className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Calificado por</div>
-                    <div className="text-sm font-bold">IA de Cursia</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── Value Proposition ── */}
-        <section className="py-24 bg-cursia-surface-low">
-          <div className="max-w-7xl mx-auto px-6">
-
-            {/* Section header */}
-            <div className="text-center max-w-3xl mx-auto mb-16">
-              <div className="inline-flex items-center gap-2 px-5 py-2 bg-cursia-blue/10 text-cursia-blue rounded-full font-body font-bold text-xs uppercase tracking-widest border border-cursia-blue/20 mb-6">
-                <BookOpen className="w-4 h-4" />
-                Nuestros Cursos
-              </div>
-              <h2 className="text-4xl md:text-5xl font-extrabold font-headline leading-tight text-cursia-on-surface mb-5">
-                Cursos que transforman <span className="text-cursia-blue">equipos</span>
-              </h2>
-              <p className="text-lg text-cursia-on-surface-dim leading-relaxed">
-                Cada curso lo creamos desde cero para su empresa. No hay plantillas ni contenido genérico — solo aprendizaje diseñado para que su equipo aplique lo aprendido desde el primer día.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-              {[
-                {
-                  icon: <Users className="w-8 h-8" />,
-                  title: "Diseñados a su medida",
-                  desc: "Cada curso nace de una sesión estratégica donde entendemos su empresa, su cultura y sus metas. El resultado: contenido que resuena con su equipo y genera impacto real.",
-                },
-                {
-                  icon: <Sparkles className="w-8 h-8" />,
-                  title: "Acompañamiento constante",
-                  desc: "Durante todo el curso, cada empleado cuenta con un asistente de IA disponible 24/7 que resuelve dudas, refuerza conceptos y se adapta al ritmo de cada persona.",
-                },
-                {
-                  icon: <ShieldCheck className="w-8 h-8" />,
-                  title: "Evaluaciones que importan",
-                  desc: "Nada de opciones múltiples. Evaluamos con preguntas abiertas que la IA califica, garantizando que cada certificado refleje conocimiento genuino, no respuestas memorizadas.",
-                },
-              ].map(({ icon, title, desc }) => (
-                <div
-                  key={title}
-                  className="group bg-white p-10 rounded-[2rem] transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-cursia-blue/5"
-                >
-                  <div className="w-16 h-16 bg-cursia-blue/10 text-cursia-blue rounded-[1.25rem] flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
-                    {icon}
-                  </div>
-                  <h3 className="text-xl font-bold mb-4 font-headline">{title}</h3>
-                  <p className="text-cursia-on-surface-dim leading-relaxed">{desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Admin Section ── */}
-        <section id="admin" className="py-32 bg-white">
-          <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-
-            {/* Dashboard screenshot */}
-            <div className="relative hidden lg:block">
-              <div className="absolute inset-0 bg-slate-200/20 rounded-[2rem] -rotate-2 -z-10" />
-              <div
-                onClick={() => setPanelZoomed(true)}
-                className="rounded-[2rem] shadow-2xl overflow-hidden border border-slate-200/60 scale-[1.18] origin-left cursor-zoom-in group transition-all duration-500 hover:shadow-[0_30px_60px_-10px_rgba(0,102,255,0.2)] hover:scale-[1.21] hover:-rotate-1"
-              >
-                <Image
-                  src="/PanelCursia.png"
-                  alt="Panel de administración Cursia"
-                  width={1200}
-                  height={800}
-                  className="w-full h-auto transition-transform duration-500 group-hover:scale-[1.02]"
-                  priority
-                />
-                <div className="absolute inset-0 bg-cursia-blue/0 group-hover:bg-cursia-blue/5 transition-all duration-500 rounded-[2rem] flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full text-xs font-bold text-cursia-blue shadow-lg">
-                    Click para ampliar
-                  </div>
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Lightbox */}
-            {panelZoomed && (
-              <div
-                className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 cursor-zoom-out"
-                onClick={() => setPanelZoomed(false)}
-              >
-                <div className="relative max-w-6xl w-full rounded-[2rem] overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-                  <Image
-                    src="/PanelCursia.png"
-                    alt="Panel de administración Cursia"
-                    width={1800}
-                    height={1200}
-                    className="w-full h-auto"
-                  />
+            {/* Controles manuales */}
+            <div className="mt-10 flex items-center justify-center gap-5">
+              <button onClick={() => goSvc(-1)} aria-label="Anterior" className="flex h-12 w-12 items-center justify-center rounded-full border border-black/[0.08] bg-white text-[#191C1E] hover:border-[#0066FF]/40 hover:text-[#0066FF] transition-all">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-2">
+                {SERVICES.map((s, i) => (
                   <button
-                    className="absolute top-4 right-4 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center text-slate-700 hover:bg-white transition-all shadow-lg font-bold text-lg"
-                    onClick={() => setPanelZoomed(false)}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Text content */}
-            <div className="space-y-8 lg:pl-10">
-              <h2 className="text-4xl lg:text-5xl font-extrabold font-headline leading-tight">
-                Gestión Corporativa{" "}
-                <span className="text-cursia-blue">Sin Fricción</span>
-              </h2>
-              <p className="text-lg text-cursia-on-surface-dim leading-relaxed">
-                Nuestra consola le da visibilidad completa sobre el avance de cada empleado en su curso — en tiempo real, sin reportes manuales ni depender del área de TI.
-              </p>
-              <ul className="space-y-6">
-                {[
-                  {
-                    icon: <PieChart className="w-5 h-5" />,
-                    title: "Reportes Personalizados",
-                    desc: "Vea exactamente en qué módulo del curso está cada empleado y exporte analíticas detalladas con un solo clic.",
-                  },
-                  {
-                    icon: <Users className="w-5 h-5" />,
-                    title: "Personalización Total",
-                    desc: "Tiempos de capacitación, porcentajes de aprobación y metas configurables según los estándares de su organización.",
-                  },
-                  {
-                    icon: <BarChart2 className="w-5 h-5" />,
-                    title: "Monitoreo en Tiempo Real",
-                    desc: "Sepa al instante quién está avanzando en el curso, quién se quedó atrás y dónde están las fricciones, sin esperar reportes periódicos.",
-                  },
-                ].map(({ icon, title, desc }) => (
-                  <li key={title} className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-cursia-blue/10 text-cursia-blue flex items-center justify-center shrink-0">
-                      {icon}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900">{title}</h4>
-                      <p className="text-sm text-slate-500">{desc}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* ── AI Technology Section ── */}
-        <section id="ai" className="py-32 bg-slate-50 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-1/2 h-full bg-cursia-blue/5 blur-[150px] -z-0" />
-          <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-2 gap-20 items-center relative z-10">
-
-            {/* Left: text + cards */}
-            <div className="order-2 lg:order-1 space-y-8">
-              <div className="inline-block px-4 py-1.5 bg-cursia-blue/10 text-cursia-blue rounded-full text-xs font-extrabold uppercase tracking-widest border border-cursia-blue/20">
-                Tecnología de Vanguardia
-              </div>
-              <h2 className="text-4xl lg:text-5xl font-extrabold font-headline leading-[1.2] text-cursia-on-surface">
-                La IA que{" "}
-                <span className="text-cursia-blue">Verifica</span> el Talento
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4">
-                {[
-                  {
-                    icon: <ShieldCheck className="w-7 h-7" />,
-                    title: "Detección de Fraude",
-                    desc: "Identificamos cuando un empleado usa herramientas de IA externas para responder evaluaciones. Cada certificación emitida por Cursia refleja conocimiento genuino, no respuestas generadas.",
-                  },
-                  {
-                    icon: <Brain className="w-7 h-7" />,
-                    title: "Evaluación Cognitiva",
-                    desc: "Más allá de las respuestas, analizamos el proceso de razonamiento para identificar líderes potenciales.",
-                  },
-                ].map(({ icon, title, desc }) => (
-                  <div
-                    key={title}
-                    className="group bg-white p-8 rounded-[2rem] transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-cursia-blue/10"
-                  >
-                    <div className="w-14 h-14 bg-cursia-blue/10 text-cursia-blue rounded-[1.25rem] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                      {icon}
-                    </div>
-                    <h4 className="text-xl font-bold mb-3 font-headline text-cursia-on-surface">{title}</h4>
-                    <p className="text-cursia-on-surface-dim text-sm leading-relaxed">{desc}</p>
-                  </div>
+                    key={s.slug}
+                    onClick={() => setActiveSvc(i)}
+                    aria-label={`Ir a ${s.title}`}
+                    className={`h-2 rounded-full transition-all duration-300 ${i === activeSvc ? "w-7 bg-[#0066FF]" : "w-2 bg-black/15 hover:bg-black/30"}`}
+                  />
                 ))}
               </div>
-            </div>
-
-            {/* Right: Neural Trust circle */}
-            <div className="order-1 lg:order-2 flex justify-center">
-              <div className="relative w-full max-w-md aspect-square flex items-center justify-center">
-                <div className="absolute inset-0 bg-cursia-blue/10 rounded-full blur-[100px] animate-pulse" />
-                <div className="relative z-10 w-full h-full bg-white border border-slate-200 shadow-xl rounded-full flex flex-col items-center justify-center p-12 text-center">
-                  <div className="w-24 h-24 bg-cursia-blue/5 rounded-full flex items-center justify-center mb-6 ring-1 ring-cursia-blue/20">
-                    <Brain className="w-12 h-12 text-cursia-blue animate-pulse" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl font-bold font-headline text-slate-900">AI Detection</div>
-                    <div className="text-sm text-slate-500 font-medium">Motor de verificación corporativa</div>
-                  </div>
-                  <div className="mt-8 flex gap-2">
-                    <div className="w-2 h-2 rounded-full bg-cursia-blue/40 animate-bounce [animation-delay:-0.3s]" />
-                    <div className="w-2 h-2 rounded-full bg-cursia-blue/60 animate-bounce [animation-delay:-0.15s]" />
-                    <div className="w-2 h-2 rounded-full bg-cursia-blue animate-bounce" />
-                  </div>
-                </div>
-              </div>
+              <button onClick={() => goSvc(1)} aria-label="Siguiente" className="flex h-12 w-12 items-center justify-center rounded-full border border-black/[0.08] bg-white text-[#191C1E] hover:border-[#0066FF]/40 hover:text-[#0066FF] transition-all">
+                <ArrowRight className="w-5 h-5" />
+              </button>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* ── Contact Section ── */}
-        <section id="contacto" className="py-32 bg-cursia-surface-low">
-          <div className="max-w-4xl mx-auto px-6">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl font-extrabold font-headline mb-4">
-                Solicite su Evaluación{" "}
-                <span className="text-cursia-blue">Gratuita</span>
+      {/* ── PROCESO ── */}
+      <section id="proceso" className="relative z-10 px-6 py-24 bg-[#F7F9FB] border-y border-black/[0.05]">
+        <div className="max-w-5xl mx-auto">
+          <div data-reveal className="reveal text-center max-w-2xl mx-auto">
+            <span className="text-xs font-bold uppercase tracking-[0.25em] text-[#7C3AED]">Proceso</span>
+            <h2 className="font-headline font-extrabold tracking-tight mt-4 text-[clamp(1.9rem,5vw,3rem)] leading-[1.05]">
+              Del diagnóstico <span className="grad-text">a la evidencia.</span>
+            </h2>
+          </div>
+          <div className="mt-14 grid sm:grid-cols-3 gap-5">
+            {[
+              { n: "01", t: "Diagnóstico", d: "Analizamos tu necesidad y definimos el alcance exacto. Sin costo." },
+              { n: "02", t: "Construcción", d: "Diseñamos y desarrollamos a tu medida, con IA y estándares premium." },
+              { n: "03", t: "Evidencia", d: "Entregamos resultados medibles y reportes claros para decidir." },
+            ].map((p) => (
+              <div key={p.n} data-reveal className="reveal rounded-3xl border border-black/[0.06] bg-white p-7 shadow-[0_20px_60px_-40px_rgba(2,12,40,0.3)]">
+                <span className="font-headline text-3xl font-extrabold grad-text">{p.n}</span>
+                <h3 className="font-headline font-bold text-lg mt-3">{p.t}</h3>
+                <p className="text-sm text-[#424656] mt-1.5 leading-relaxed">{p.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── RESEÑAS (slider) ── */}
+      <section id="resenas" className="relative z-10 px-6 pt-24 sm:pt-28 pb-10">
+        <div className="max-w-6xl mx-auto">
+          <div data-reveal className="reveal flex flex-wrap items-end justify-between gap-6">
+            <div className="max-w-2xl">
+              <span className="text-xs font-bold uppercase tracking-[0.25em] text-[#7C3AED]">Reseñas</span>
+              <h2 className="font-headline font-extrabold tracking-tight mt-4 text-[clamp(2rem,5vw,3.2rem)] leading-[1.05]">
+                Lo que dicen <span className="grad-text">los equipos.</span>
               </h2>
-              <p className="text-cursia-on-surface-dim max-w-xl mx-auto">
-                Complete el formulario y uno de nuestros consultores senior se pondrá en contacto para diseñar su prueba personalizada.
-              </p>
+              <p className="mt-3 text-xs text-[#424656]/70 italic">* Reseñas de ejemplo — reemplazar por testimonios reales.</p>
             </div>
+            <div className="flex gap-3">
+              <button onClick={() => slide(reviewsRail, -1)} aria-label="Anterior" className="flex h-12 w-12 items-center justify-center rounded-full border border-black/[0.08] bg-white text-[#191C1E] hover:border-[#0066FF]/40 hover:text-[#0066FF] transition-all">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <button onClick={() => slide(reviewsRail, 1)} aria-label="Siguiente" className="flex h-12 w-12 items-center justify-center rounded-full border border-black/[0.08] bg-white text-[#191C1E] hover:border-[#0066FF]/40 hover:text-[#0066FF] transition-all">
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
 
-            <div className="bg-white p-8 lg:p-12 rounded-[2rem] shadow-2xl shadow-cursia-blue/5">
-              {formSubmitted ? (
-                <div className="py-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-center animate-in fade-in duration-300">
-                  <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-4" />
-                  <p className="text-xl font-bold text-emerald-800">¡Solicitud recibida!</p>
-                  <p className="text-sm text-emerald-600 mt-2">
-                    Nos ponemos en contacto en menos de 24 horas para diseñar su evaluación.
-                  </p>
-                </div>
-              ) : (
-                <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
-                  {/* Row 1: Nombre + Celular */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase ml-1 flex items-center gap-1.5">
-                        <User className="w-3 h-3" /> Nombre completo
-                      </label>
-                      <input
-                        type="text"
-                        name="nombre"
-                        value={formData.nombre}
-                        onChange={handleInputChange}
-                        placeholder="Ej: Juan Pérez"
-                        className="w-full px-6 py-4 bg-cursia-surface rounded-[1rem] border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-cursia-blue focus:outline-none transition-all font-body"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase ml-1 flex items-center gap-1.5">
-                        <Smartphone className="w-3 h-3" /> Celular
-                      </label>
-                      <input
-                        type="tel"
-                        name="celular"
-                        value={formData.celular}
-                        onChange={handleInputChange}
-                        placeholder="+57 300 000 0000"
-                        className="w-full px-6 py-4 bg-cursia-surface rounded-[1rem] border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-cursia-blue focus:outline-none transition-all font-body"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Row 2: Correo + Empresa */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase ml-1 flex items-center gap-1.5">
-                        <Mail className="w-3 h-3" /> Correo corporativo
-                      </label>
-                      <input
-                        type="email"
-                        name="correo"
-                        value={formData.correo}
-                        onChange={handleInputChange}
-                        placeholder="jperez@empresa.com"
-                        className="w-full px-6 py-4 bg-cursia-surface rounded-[1rem] border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-cursia-blue focus:outline-none transition-all font-body"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 uppercase ml-1 flex items-center gap-1.5">
-                        <Building2 className="w-3 h-3" /> Empresa
-                      </label>
-                      <input
-                        type="text"
-                        name="empresa"
-                        value={formData.empresa}
-                        onChange={handleInputChange}
-                        placeholder="Ej: Mi Empresa S.A.S"
-                        className="w-full px-6 py-4 bg-cursia-surface rounded-[1rem] border-none ring-1 ring-slate-200 focus:ring-2 focus:ring-cursia-blue focus:outline-none transition-all font-body"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Submit */}
-                  <div className="pt-2">
-                    <button
-                      type="button"
-                      onClick={handleSubmitLead}
-                      disabled={!isFormValid || formSubmitting}
-                      className={`w-full py-5 rounded-[1.25rem] font-headline font-bold text-lg transition-all flex items-center justify-center gap-3 ${
-                        isFormValid && !formSubmitting
-                          ? "bg-cursia-blue text-white hover:bg-blue-700 shadow-lg shadow-blue-500/20 active:scale-[0.98]"
-                          : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                      }`}
-                    >
-                      <Send className="w-5 h-5" />
-                      {formSubmitting ? "Enviando..." : "Solicitar mi Evaluación Gratuita"}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* WhatsApp */}
-              <a
-                href="https://wa.me/573246590060"
-                target="_blank"
-                rel="noreferrer"
-                className="mt-6 flex items-center gap-5 p-5 rounded-[1.25rem] bg-cursia-surface border border-slate-200 hover:shadow-md hover:border-green-200 transition-all group"
+          <div ref={reviewsRail} className="rail mt-12 flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory">
+            {REVIEWS.map((r, i) => (
+              <figure
+                key={i}
+                onMouseMove={onCardMouseMove}
+                className="review-card spotlight-card group relative shrink-0 snap-start w-[85%] sm:w-[360px] overflow-hidden rounded-3xl border border-[#7C3AED]/15 p-7 shadow-[0_30px_70px_-38px_rgba(124,58,237,0.5)] transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_44px_100px_-44px_rgba(124,58,237,0.6)] hover:border-[#7C3AED]/30"
+                style={{ background: "linear-gradient(160deg, #FFFFFF 0%, #F4F1FF 100%)", ["--spot" as string]: "rgba(124,58,237,0.16)" }}
               >
-                <div className="w-12 h-12 rounded-[0.875rem] bg-[#25D366] flex items-center justify-center text-white shrink-0">
-                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-                  </svg>
+                <div className="flex items-center justify-between">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0066FF] to-[#7C3AED] text-white shadow-[0_12px_26px_-10px_rgba(124,58,237,0.7)]">
+                    <Quote className="w-5 h-5" />
+                  </span>
+                  <div className="flex items-center gap-0.5">
+                    {[0, 1, 2, 3, 4].map((s) => <Star key={s} className="w-3.5 h-3.5 fill-[#7C3AED] text-[#7C3AED]" />)}
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="font-bold text-slate-800">¿Prefiere escribirnos directamente?</p>
-                  <p className="text-sm text-slate-500">Respuesta inmediata por WhatsApp</p>
-                </div>
-                <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-green-500 group-hover:translate-x-1 transition-all" />
+                <blockquote className="mt-5 text-[15px] text-[#191C1E] leading-relaxed">{r.quote}</blockquote>
+                <figcaption className="mt-5 pt-5 border-t border-[#7C3AED]/10">
+                  <div className="font-semibold text-sm text-[#191C1E]">{r.role}</div>
+                  <div className="text-xs text-[#424656]">{r.org}</div>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA / CONTACTO (claro, coherente con el resto) ── */}
+      <section id="contacto" className="relative z-10 px-6 pt-8 pb-24">
+        <div data-reveal className="reveal relative max-w-4xl mx-auto rounded-[2.5rem] border border-black/[0.06] bg-white p-10 sm:p-16 text-center shadow-[0_40px_120px_-50px_rgba(2,12,40,0.3)] overflow-hidden">
+          <div aria-hidden className="absolute -top-24 left-1/2 -translate-x-1/2 h-64 w-[36rem] max-w-full rounded-full bg-gradient-to-r from-[#0066FF]/15 to-[#7C3AED]/15 blur-3xl" />
+          <div className="relative">
+            <span className="text-xs font-bold uppercase tracking-[0.25em] text-[#7C3AED]">Empecemos</span>
+            <h2 className="font-headline font-extrabold tracking-tight mt-4 text-[clamp(1.9rem,5vw,3.2rem)] leading-[1.06]">
+              Conversemos sobre <span className="grad-text">tu próximo proyecto.</span>
+            </h2>
+            <p className="mx-auto mt-5 max-w-xl text-base text-[#424656]">
+              Diagnóstico inicial sin costo. Te mostramos exactamente qué podemos construir contigo.
+            </p>
+            <div className="mt-9 flex justify-center">
+              <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="group inline-flex items-center gap-2 rounded-full bg-[#0066FF] px-8 py-4 text-base font-semibold text-white shadow-[0_16px_40px_-12px_rgba(0,102,255,0.7)] hover:bg-[#0052cc] transition-all">
+                Solicitar diagnóstico gratis <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </a>
             </div>
-
-            {/* Instagram */}
-            <div className="max-w-2xl mx-auto w-full mt-16 pt-16 border-t border-slate-200/60">
-              <div className="flex flex-col sm:flex-row items-center gap-8">
-                <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-500 to-orange-400 flex items-center justify-center text-white shrink-0 shadow-lg shadow-pink-500/20">
-                  <Instagram className="w-10 h-10" />
-                </div>
-                <div className="flex-1 text-center sm:text-left">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Síguenos en Instagram</p>
-                  <p className="text-2xl font-extrabold text-slate-900 mb-2">@cursia.online</p>
-                  <p className="text-slate-500 text-base leading-relaxed">
-                    Casos de uso reales, consejos sobre capacitación corporativa con IA y novedades de la plataforma. Contenido pensado para líderes de equipos.
-                  </p>
-                </div>
-                <a
-                  href="https://instagram.com/cursia.online"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-[1rem] border-2 border-pink-200 text-pink-600 font-bold hover:bg-pink-50 transition-all"
-                >
-                  Ver perfil <ArrowRight className="w-4 h-4" />
-                </a>
-              </div>
-            </div>
           </div>
-        </section>
-      </main>
-
-      {/* ── Footer ── */}
-      <footer className="bg-slate-50 w-full py-12 border-t border-slate-200/20">
-        <div className="flex flex-col md:flex-row justify-between items-center px-8 max-w-7xl mx-auto gap-6">
-          <div className="text-xl font-bold font-headline">
-            <span className="text-slate-900">Curs</span><span className="text-cursia-blue">ia</span>
-          </div>
-          <div className="flex gap-8">
-            <a href="https://instagram.com/cursia.online" className="font-body text-sm text-slate-500 hover:text-cursia-blue transition-colors">Instagram</a>
-          </div>
-          <p className="font-body text-sm text-slate-500">© 2026 Cursia for Enterprise.</p>
         </div>
-      </footer>
 
-      {/* ── Floating WhatsApp Button ── */}
-      {showWhatsAppButton && (
-        <a
-          href="https://wa.me/573246590060"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fixed bottom-8 right-8 w-16 h-16 bg-[#25D366] hover:bg-[#20BA5A] text-white rounded-full flex items-center justify-center shadow-2xl hover:shadow-[#25D366]/50 hover:scale-110 active:scale-95 transition-all z-[60] animate-in fade-in duration-300"
-          aria-label="Contactar por WhatsApp"
-        >
-          <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
-          </svg>
-        </a>
-      )}
+        <footer className="max-w-4xl mx-auto mt-14 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-[#424656]">
+          <span className="font-headline font-extrabold text-base text-[#191C1E]">Curs<span className="text-[#0066FF]">ia</span></span>
+          <span>© {new Date().getFullYear()} Cursia · Inteligencia que construye.</span>
+        </footer>
+      </section>
     </div>
+  );
+}
+
+/* ── MouseField: campo de puntos interactivo (canvas) ─────────────────────── */
+function MouseField() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const ctx = canvas.getContext("2d");
+    const parent = canvas.parentElement;
+    if (!ctx || !parent) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const GAP = 30;
+    const R = 160;
+    let width = 0, height = 0;
+    let dots: { x: number; y: number }[] = [];
+    const mouse = { x: -9999, y: -9999, tx: -9999, ty: -9999 };
+
+    const build = () => {
+      width = parent.clientWidth;
+      height = parent.clientHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dots = [];
+      for (let y = GAP; y < height; y += GAP)
+        for (let x = GAP; x < width; x += GAP) dots.push({ x, y });
+    };
+    build();
+
+    const ro = new ResizeObserver(build);
+    ro.observe(parent);
+
+    const onMove = (e: MouseEvent) => {
+      const r = canvas.getBoundingClientRect();
+      mouse.tx = e.clientX - r.left;
+      mouse.ty = e.clientY - r.top;
+    };
+    const onLeave = () => { mouse.tx = -9999; mouse.ty = -9999; };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    window.addEventListener("mouseout", onLeave);
+
+    let raf = 0;
+    const frame = () => {
+      mouse.x += (mouse.tx - mouse.x) * 0.15;
+      mouse.y += (mouse.ty - mouse.y) * 0.15;
+      ctx.clearRect(0, 0, width, height);
+      for (const d of dots) {
+        const dx = d.x - mouse.x;
+        const dy = d.y - mouse.y;
+        const dist = Math.hypot(dx, dy);
+        let ox = 0, oy = 0, size = 1.1, alpha = 0.16, mix = 0;
+        if (dist < R) {
+          const f = 1 - dist / R;
+          const ang = Math.atan2(dy, dx);
+          const push = f * 22;
+          ox = Math.cos(ang) * push;
+          oy = Math.sin(ang) * push;
+          size = 1.1 + f * 2.6;
+          alpha = 0.16 + f * 0.7;
+          mix = f;
+        }
+        const rr = Math.round(0 + (124 - 0) * mix);
+        const gg = Math.round(102 + (58 - 102) * mix);
+        const bb = Math.round(255 + (237 - 255) * mix);
+        ctx.beginPath();
+        ctx.arc(d.x + ox, d.y + oy, size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${rr},${gg},${bb},${alpha})`;
+        ctx.fill();
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    frame();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseout", onLeave);
+    };
+  }, []);
+  return <canvas ref={canvasRef} aria-hidden className="absolute inset-0 z-0 h-full w-full pointer-events-none" />;
+}
+
+/* ── Estilos ──────────────────────────────────────────────────────────────── */
+function StyleBlock() {
+  return (
+    <style>{`
+      .cursia-root .reveal { opacity: 0; transform: translateY(26px); transition: opacity .85s cubic-bezier(.16,1,.3,1), transform .85s cubic-bezier(.16,1,.3,1); }
+      .cursia-root .reveal.is-visible { opacity: 1; transform: translateY(0); }
+      .cursia-root .reveal--1.is-visible { transition-delay: .06s; }
+      .cursia-root .reveal--2.is-visible { transition-delay: .12s; }
+      .cursia-root .reveal--3.is-visible { transition-delay: .18s; }
+      .cursia-root .reveal--4.is-visible { transition-delay: .24s; }
+
+      .cursia-root .grad-text {
+        display: inline-block;
+        background: linear-gradient(95deg, #0066FF 0%, #4F7DFF 45%, #7C3AED 100%);
+        background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent;
+        line-height: 1.18; padding-bottom: 0.12em; padding-right: 0.04em;
+        animation: gradShift 8s ease infinite;
+      }
+      @keyframes gradShift { 0%,100% { background-position: 0% center; } 50% { background-position: 100% center; } }
+
+      .cursia-root .aura { position: absolute; border-radius: 50%; filter: blur(110px); opacity: .55; }
+      .cursia-root .aura--blue { width: 46vw; height: 46vw; top: -14vw; right: -8vw; background: radial-gradient(circle, rgba(0,102,255,.22), transparent 70%); }
+      .cursia-root .aura--violet { width: 42vw; height: 42vw; bottom: -16vw; left: -10vw; background: radial-gradient(circle, rgba(124,58,237,.18), transparent 70%); }
+      .cursia-root .grid-faint {
+        position: absolute; inset: 0;
+        background-image: linear-gradient(rgba(2,12,40,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(2,12,40,.04) 1px, transparent 1px);
+        background-size: 56px 56px;
+        mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+        -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+      }
+
+      .cursia-root .hero { --px: 0; --py: 0; }
+      .cursia-root .parallax-card { transform: translate3d(calc(var(--px) * -16px), calc(var(--py) * -16px), 0) rotateX(calc(var(--py) * 3deg)) rotateY(calc(var(--px) * -3deg)); transition: transform .25s ease-out; will-change: transform; }
+
+      .cursia-root .gradient-ring { background: conic-gradient(from 140deg, #0066FF, #7C3AED, #4F7DFF, #0066FF); }
+
+      .cursia-root .spotlight-card { --cx: 50%; --cy: 50%; --spot: rgba(0,102,255,0.12); }
+      .cursia-root .spotlight-card::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+        background: radial-gradient(340px circle at var(--cx) var(--cy), var(--spot), transparent 65%); transition: opacity .3s ease; z-index: 1; }
+      .cursia-root .spotlight-card:hover::before { opacity: 1; }
+      .cursia-root .spotlight-card > *:not([aria-hidden]) { position: relative; z-index: 2; }
+
+      .cursia-root .marquee { animation: marquee 36s linear infinite; }
+      @keyframes marquee { to { transform: translateX(-50%); } }
+
+      .cursia-root .svc3d { touch-action: pan-y; }
+
+      /* Constelación del hero */
+      .cursia-root .orbit-ring { transform: translate(-50%,-50%); animation: orbitSpin 70s linear infinite; }
+      .cursia-root .orbit-ring-rev { transform: translate(-50%,-50%); animation: orbitSpin 55s linear infinite reverse; }
+      @keyframes orbitSpin { from { transform: translate(-50%,-50%) rotate(0); } to { transform: translate(-50%,-50%) rotate(360deg); } }
+      .cursia-root .node { transform: translate(-50%,-50%); animation: nodeFloat 5.5s ease-in-out infinite; will-change: transform; }
+      @keyframes nodeFloat { 0%,100% { transform: translate(-50%,-50%); } 50% { transform: translate(-50%, calc(-50% - 8px)); } }
+      .cursia-root .cline { animation: clineDash 1.6s linear infinite; }
+      @keyframes clineDash { to { stroke-dashoffset: -7; } }
+      .cursia-root .core-ping { background: radial-gradient(circle, rgba(124,58,237,0.4), transparent 70%); animation: corePulse 3.2s ease-in-out infinite; }
+      @keyframes corePulse { 0% { transform: scale(.9); opacity: .6; } 70%,100% { transform: scale(1.7); opacity: 0; } }
+
+      .cursia-root .svc-spine { animation: spineShift 5.5s linear infinite; }
+      @keyframes spineShift { to { background-position: 200% 0; } }
+
+      .cursia-root .svc-glow { opacity: .45; animation: glowPulse 5s ease-in-out infinite; }
+      .cursia-root .svc-card:hover .svc-glow { opacity: .85; }
+      @keyframes glowPulse { 0%,100% { opacity: .4; transform: scale(1); } 50% { opacity: .72; transform: scale(1.14); } }
+
+      .cursia-root .rail { scrollbar-width: none; -ms-overflow-style: none; }
+      .cursia-root .rail::-webkit-scrollbar { display: none; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .cursia-root .reveal { opacity: 1; transform: none; }
+        .cursia-root .parallax-card, .cursia-root .marquee, .cursia-root .grad-text,
+        .cursia-root .svc-spine, .cursia-root .svc-glow,
+        .cursia-root .orbit-ring, .cursia-root .orbit-ring-rev, .cursia-root .node,
+        .cursia-root .cline, .cursia-root .core-ping { animation: none !important; }
+      }
+    `}</style>
   );
 }
