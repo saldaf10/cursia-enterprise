@@ -209,10 +209,10 @@ export default function ReinventionLanding() {
                 {/* líneas conectoras */}
                 <svg aria-hidden viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
                   <defs>
-                    <linearGradient id="cline" x1="0" y1="0" x2="1" y2="1">
+                    <radialGradient id="cline" gradientUnits="userSpaceOnUse" cx="50" cy="50" r="40">
                       <stop offset="0%" stopColor="#0066FF" stopOpacity="0.55" />
                       <stop offset="100%" stopColor="#7C3AED" stopOpacity="0.12" />
-                    </linearGradient>
+                    </radialGradient>
                   </defs>
                   {NODES.map((n) => (
                     <line key={n.label} x1="50" y1="50" x2={n.x} y2={n.y} stroke="url(#cline)" strokeWidth={1.4} vectorEffect="non-scaling-stroke" strokeDasharray="3 4" className="cline" />
