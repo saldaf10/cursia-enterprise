@@ -71,6 +71,8 @@ const NODES = SERVICES.map((s, k) => {
   const R = 37; // radio en %
   return {
     label: NODE_LABELS[k] ?? s.title,
+    slug: s.slug,
+    title: s.title,
     icon: s.icon,
     tone: s.tone,
     x: +(50 + R * Math.cos(ang)).toFixed(2),
@@ -85,6 +87,19 @@ export default function ReinventionLanding() {
   const [scrolled, setScrolled] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
 
+  // Modo compacto (móvil): mismo coverflow 3D, solo más pequeño
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setCompact(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const geo = compact
+    ? { cardW: 280, cardH: 484, stepX: 170, stepZ: 200, stageH: 520, persp: 1700, clickX: 118 }
+    : { cardW: 330, cardH: 480, stepX: 236, stepZ: 240, stageH: 500, persp: 2000, clickX: 175 };
+
   // Coverflow 3D de servicios (manual, giratorio infinito)
   const [activeSvc, setActiveSvc] = useState(0);
   const goSvc = useCallback(
@@ -92,6 +107,7 @@ export default function ReinventionLanding() {
     []
   );
   const svcDrag = useRef<{ x: number; active: boolean }>({ x: 0, active: false });
+  const clickXRef = useRef(175);
   const onSvcPointerDown = useCallback((e: React.PointerEvent) => {
     svcDrag.current = { x: e.clientX, active: true };
   }, []);
@@ -104,8 +120,8 @@ export default function ReinventionLanding() {
     // Clic simple: según la mitad donde se hizo clic
     const rect = e.currentTarget.getBoundingClientRect();
     const rel = e.clientX - (rect.left + rect.width / 2);
-    if (rel > 175) goSvc(1);
-    else if (rel < -175) goSvc(-1);
+    if (rel > clickXRef.current) goSvc(1);
+    else if (rel < -clickXRef.current) goSvc(-1);
     // Zona central (tarjeta activa): no mueve, deja navegar el botón
   }, [goSvc]);
 
@@ -132,6 +148,8 @@ export default function ReinventionLanding() {
     hero.addEventListener("mousemove", onMove);
     return () => { hero.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
   }, []);
+
+  clickXRef.current = geo.clickX;
 
   return (
     <div className="cursia-root min-h-screen bg-white text-[#191C1E] antialiased font-body selection:bg-[#0066FF]/15 selection:text-[#0066FF] overflow-x-hidden">
@@ -219,18 +237,27 @@ export default function ReinventionLanding() {
                   ))}
                 </svg>
 
-                {/* nodos de servicios */}
+                {/* nodos de servicios (interactivos → enlazan al servicio) */}
                 {NODES.map((n, idx) => {
                   const tt = tone[n.tone]; const NIcon = n.icon;
                   return (
-                    <div key={n.label} className="node absolute" style={{ left: `${n.x}%`, top: `${n.y}%`, animationDelay: `${idx * 0.45}s` }}>
+                    <Link
+                      key={n.label}
+                      href={`/servicios/${n.slug}`}
+                      aria-label={`Ver servicio: ${n.title}`}
+                      className="node group absolute"
+                      style={{ left: `${n.x}%`, top: `${n.y}%`, animationDelay: `${idx * 0.45}s`, ["--g1" as string]: tt.c, ["--g2" as string]: tt.c2, ["--gsoft" as string]: tt.soft }}
+                    >
                       <div className="flex flex-col items-center gap-1.5">
-                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white ring-1 ring-black/[0.06] shadow-[0_14px_30px_-12px_rgba(2,12,40,0.45)]" style={{ color: tt.c }}>
+                        <span className="nicon flex h-12 w-12 items-center justify-center rounded-2xl bg-white ring-1 ring-black/[0.06] shadow-[0_14px_30px_-12px_rgba(2,12,40,0.45)]" style={{ color: tt.c }}>
                           <NIcon className="h-5 w-5" />
                         </span>
-                        <span className="rounded-md bg-white/85 px-1.5 text-[11px] font-semibold text-[#191C1E] backdrop-blur-sm">{n.label}</span>
+                        <span className="nlabel inline-flex items-center gap-1 rounded-md bg-white/85 px-1.5 text-[11px] font-semibold text-[#191C1E] backdrop-blur-sm">
+                          {n.label}
+                          <ArrowUpRight className="nlabel-arrow h-3 w-3" />
+                        </span>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
 
@@ -275,15 +302,15 @@ export default function ReinventionLanding() {
 
           <div className="svc3d mt-14 select-none">
             <div
-              className="relative mx-auto h-[500px]"
-              style={{ perspective: "2000px" }}
+              className="relative mx-auto"
+              style={{ height: geo.stageH, perspective: `${geo.persp}px` }}
               onPointerDown={onSvcPointerDown}
               onPointerUp={onSvcPointerUp}
               onPointerLeave={onSvcPointerUp}
             >
               <div className="absolute inset-0" style={{ transformStyle: "preserve-3d" }}>
                 {SERVICES.map((s, i) => {
-                  const t = tone[s.tone]; const Icon = s.icon;
+                  const t = tone[s.tone];
                   let d = i - activeSvc;
                   if (d > SERVICES.length / 2) d -= SERVICES.length;
                   if (d < -SERVICES.length / 2) d += SERVICES.length;
@@ -294,12 +321,14 @@ export default function ReinventionLanding() {
                     <div
                       key={s.slug}
                       onMouseMove={onCardMouseMove}
-                      className={`svc-card spotlight-card group absolute left-1/2 top-0 flex h-[480px] w-[330px] flex-col overflow-hidden rounded-[26px] border ${isActive ? "cursor-default" : "cursor-pointer"}`}
+                      className={`svc-card spotlight-card group absolute left-1/2 top-0 flex flex-col overflow-hidden rounded-[26px] border ${isActive ? "cursor-default" : "cursor-pointer"}`}
                       style={{
+                        height: geo.cardH,
+                        width: geo.cardW,
                         background: `radial-gradient(130% 90% at 100% 0%, ${t.tint}, transparent 50%), linear-gradient(168deg, #070B15 0%, #03050B 100%)`,
                         ["--spot" as string]: t.soft,
                         ["--glow" as string]: t.soft,
-                        transform: `translateX(-50%) translateX(${d * 236}px) translateZ(${-ad * 240}px) rotateY(${-d * 27}deg) scale(${1 - ad * 0.05})`,
+                        transform: `translateX(-50%) translateX(${d * geo.stepX}px) translateZ(${-ad * geo.stepZ}px) rotateY(${-d * 27}deg) scale(${1 - ad * 0.05})`,
                         zIndex: 50 - ad,
                         opacity: hidden ? 0 : 1 - ad * 0.12,
                         pointerEvents: hidden ? "none" : "auto",
@@ -308,59 +337,7 @@ export default function ReinventionLanding() {
                         transition: "transform .65s cubic-bezier(.16,1,.3,1), opacity .55s ease, box-shadow .55s ease, border-color .55s ease",
                       }}
                     >
-                      {/* spine de color superior */}
-                      <div aria-hidden className="svc-spine absolute inset-x-0 top-0 h-[3px]" style={{ background: `linear-gradient(90deg, transparent, ${t.c}, ${t.c2}, transparent)`, backgroundSize: "200% 100%" }} />
-                      {/* número fantasma */}
-                      <span aria-hidden className="absolute right-5 top-3 font-headline text-[76px] font-black leading-none text-white/[0.05] select-none">{s.n}</span>
-                      {/* icono marca de agua */}
-                      <Icon aria-hidden className="absolute -right-7 -bottom-7 h-44 w-44 text-white/[0.03]" strokeWidth={1.25} />
-                      {/* glow de color tras el icono */}
-                      <div aria-hidden className="svc-glow absolute -left-12 -top-12 h-44 w-44 rounded-full blur-[60px]" style={{ background: t.soft }} />
-
-                      <div className="relative flex flex-1 flex-col p-6">
-                        {/* chip de icono */}
-                        <div
-                          className="flex shrink-0 items-center justify-center rounded-2xl text-white ring-1 ring-white/15 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3"
-                          style={{ height: 52, width: 52, background: `linear-gradient(135deg, ${t.c}, ${t.c2})`, boxShadow: `0 16px 34px -10px ${t.soft}` }}
-                        >
-                          <Icon className="w-6 h-6" />
-                        </div>
-
-                        <span className="mt-5 block text-[10.5px] font-bold uppercase tracking-[0.22em]" style={{ color: t.c2 }}>{s.category}</span>
-                        <h3 className="font-headline text-[20px] font-extrabold text-white mt-1.5 leading-[1.15]">{s.title}</h3>
-                        <p className="mt-2.5 text-[13px] text-slate-400 leading-relaxed">{s.lead}</p>
-
-                        <div aria-hidden className="my-4 h-px w-full bg-white/[0.08]" />
-
-                        <ul className="space-y-2.5">
-                          {s.includes.slice(0, 3).map((b) => (
-                            <li key={b} className="flex items-center gap-2.5 text-[12.5px] text-slate-300">
-                              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full" style={{ background: t.tint }}>
-                                <Check className="h-2.5 w-2.5" style={{ color: t.c2 }} strokeWidth={3} />
-                              </span>
-                              {b}
-                            </li>
-                          ))}
-                        </ul>
-
-                        {/* botón / CTA */}
-                        <div className="relative mt-auto pt-5">
-                          {isActive ? (
-                            <Link href={`/servicios/${s.slug}`} className="relative block overflow-hidden rounded-xl">
-                              <span aria-hidden className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: `linear-gradient(135deg, ${t.c}, ${t.c2})` }} />
-                              <span className="relative flex items-center justify-between rounded-xl border border-white/15 px-4 py-3 text-[13px] font-semibold text-white transition-colors duration-300 group-hover:border-transparent">
-                                Conocer servicio
-                                <ArrowUpRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                              </span>
-                            </Link>
-                          ) : (
-                            <span className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-[13px] font-semibold text-white/60">
-                              Conocer servicio
-                              <ArrowUpRight className="w-4 h-4" />
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                      <ServiceCardInner s={s} linked={isActive} />
                     </div>
                   );
                 })}
@@ -425,28 +402,19 @@ export default function ReinventionLanding() {
             </h2>
           </div>
 
-          <div data-reveal className="reveal mt-12 grid gap-5 sm:grid-cols-2">
+          {/* Móvil: carrusel con scroll automático (marquee infinito) */}
+          <div data-reveal className="reveal mt-12 overflow-hidden sm:hidden">
+            <div className="marquee-rev flex w-max">
+              {[...REVIEWS, ...REVIEWS].map((r, i) => (
+                <ReviewCard key={i} r={r} className="mr-5 w-[78vw] max-w-[320px] shrink-0" />
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop: grilla estática 2×2 */}
+          <div data-reveal className="reveal mt-12 hidden gap-5 sm:grid sm:grid-cols-2">
             {REVIEWS.map((r, i) => (
-              <figure
-                key={i}
-                onMouseMove={onCardMouseMove}
-                className="review-card spotlight-card group relative overflow-hidden rounded-3xl border border-[#7C3AED]/15 p-7 shadow-[0_30px_70px_-38px_rgba(124,58,237,0.5)] transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_44px_100px_-44px_rgba(124,58,237,0.6)] hover:border-[#7C3AED]/30"
-                style={{ background: "linear-gradient(160deg, #FFFFFF 0%, #F4F1FF 100%)", ["--spot" as string]: "rgba(124,58,237,0.16)" }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0066FF] to-[#7C3AED] text-white shadow-[0_12px_26px_-10px_rgba(124,58,237,0.7)]">
-                    <Quote className="w-5 h-5" />
-                  </span>
-                  <div className="flex items-center gap-0.5">
-                    {[0, 1, 2, 3, 4].map((s) => <Star key={s} className="w-3.5 h-3.5 fill-[#7C3AED] text-[#7C3AED]" />)}
-                  </div>
-                </div>
-                <blockquote className="mt-5 text-[15px] text-[#191C1E] leading-relaxed">{r.quote}</blockquote>
-                <figcaption className="mt-5 pt-5 border-t border-[#7C3AED]/10">
-                  <div className="font-semibold text-sm text-[#191C1E]">{r.role}</div>
-                  <div className="text-xs text-[#424656]">{r.org}</div>
-                </figcaption>
-              </figure>
+              <ReviewCard key={i} r={r} />
             ))}
           </div>
         </div>
@@ -481,13 +449,110 @@ export default function ReinventionLanding() {
   );
 }
 
+/* ── Contenido interno de una tarjeta de servicio (reusado en coverflow y scroll) ── */
+function ServiceCardInner({ s, linked }: { s: (typeof SERVICES)[number]; linked: boolean }) {
+  const t = tone[s.tone];
+  const Icon = s.icon;
+  return (
+    <>
+      {/* spine de color superior */}
+      <div aria-hidden className="svc-spine absolute inset-x-0 top-0 h-[3px]" style={{ background: `linear-gradient(90deg, transparent, ${t.c}, ${t.c2}, transparent)`, backgroundSize: "200% 100%" }} />
+      {/* número fantasma */}
+      <span aria-hidden className="absolute right-5 top-3 font-headline text-[76px] font-black leading-none text-white/[0.05] select-none">{s.n}</span>
+      {/* icono marca de agua */}
+      <Icon aria-hidden className="absolute -right-7 -bottom-7 h-44 w-44 text-white/[0.03]" strokeWidth={1.25} />
+      {/* glow de color tras el icono */}
+      <div aria-hidden className="svc-glow absolute -left-12 -top-12 h-44 w-44 rounded-full blur-[60px]" style={{ background: t.soft }} />
+
+      <div className="relative flex flex-1 flex-col p-6">
+        {/* chip de icono */}
+        <div
+          className="flex shrink-0 items-center justify-center rounded-2xl text-white ring-1 ring-white/15 transition-transform duration-500 group-hover:scale-110 group-hover:-rotate-3"
+          style={{ height: 52, width: 52, background: `linear-gradient(135deg, ${t.c}, ${t.c2})`, boxShadow: `0 16px 34px -10px ${t.soft}` }}
+        >
+          <Icon className="w-6 h-6" />
+        </div>
+
+        <span className="mt-5 block text-[10.5px] font-bold uppercase tracking-[0.22em]" style={{ color: t.c2 }}>{s.category}</span>
+        <h3 className="font-headline text-[20px] font-extrabold text-white mt-1.5 leading-[1.15]">{s.title}</h3>
+        <p className="mt-2.5 text-[13px] text-slate-400 leading-relaxed">{s.lead}</p>
+
+        <div aria-hidden className="my-4 h-px w-full bg-white/[0.08]" />
+
+        <ul className="space-y-2.5">
+          {s.includes.slice(0, 3).map((b) => (
+            <li key={b} className="flex items-center gap-2.5 text-[12.5px] text-slate-300">
+              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full" style={{ background: t.tint }}>
+                <Check className="h-2.5 w-2.5" style={{ color: t.c2 }} strokeWidth={3} />
+              </span>
+              {b}
+            </li>
+          ))}
+        </ul>
+
+        {/* botón / CTA */}
+        <div className="relative mt-auto pt-5">
+          {linked ? (
+            <Link href={`/servicios/${s.slug}`} className="relative block overflow-hidden rounded-xl">
+              <span aria-hidden className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: `linear-gradient(135deg, ${t.c}, ${t.c2})` }} />
+              <span className="relative flex items-center justify-between rounded-xl border border-white/15 px-4 py-3 text-[13px] font-semibold text-white transition-colors duration-300 group-hover:border-transparent">
+                Conocer servicio
+                <ArrowUpRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </span>
+            </Link>
+          ) : (
+            <span className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-[13px] font-semibold text-white/60">
+              Conocer servicio
+              <ArrowUpRight className="w-4 h-4" />
+            </span>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ── Tarjeta de reseña (reusada en marquee móvil y grilla desktop) ─────────── */
+function ReviewCard({ r, className = "" }: { r: (typeof REVIEWS)[number]; className?: string }) {
+  return (
+    <figure
+      className={`review-card spotlight-card group relative overflow-hidden rounded-3xl border border-[#7C3AED]/15 p-7 shadow-[0_30px_70px_-38px_rgba(124,58,237,0.5)] transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_44px_100px_-44px_rgba(124,58,237,0.6)] hover:border-[#7C3AED]/30 ${className}`}
+      style={{ background: "linear-gradient(160deg, #FFFFFF 0%, #F4F1FF 100%)", ["--spot" as string]: "rgba(124,58,237,0.16)" }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0066FF] to-[#7C3AED] text-white shadow-[0_12px_26px_-10px_rgba(124,58,237,0.7)]">
+          <Quote className="w-5 h-5" />
+        </span>
+        <div className="flex items-center gap-0.5">
+          {[0, 1, 2, 3, 4].map((s) => <Star key={s} className="w-3.5 h-3.5 fill-[#7C3AED] text-[#7C3AED]" />)}
+        </div>
+      </div>
+      <blockquote className="mt-5 text-[15px] text-[#191C1E] leading-relaxed">{r.quote}</blockquote>
+      <figcaption className="mt-5 pt-5 border-t border-[#7C3AED]/10">
+        <div className="font-semibold text-sm text-[#191C1E]">{r.role}</div>
+        <div className="text-xs text-[#424656]">{r.org}</div>
+      </figcaption>
+    </figure>
+  );
+}
+
 /* ── MouseField: campo de puntos interactivo (canvas) ─────────────────────── */
 function MouseField() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [enabled, setEnabled] = useState(true);
   useEffect(() => {
+    // En móvil / pantallas táctiles el campo interactivo no aporta (no hay puntero)
+    // y el loop de canvas gasta CPU en cada frame: lo desactivamos.
+    if (
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      window.matchMedia("(max-width: 640px)").matches ||
+      window.matchMedia("(pointer: coarse)").matches
+    ) {
+      setEnabled(false);
+      return;
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const ctx = canvas.getContext("2d");
     const parent = canvas.parentElement;
     if (!ctx || !parent) return;
@@ -564,6 +629,7 @@ function MouseField() {
       window.removeEventListener("mouseout", onLeave);
     };
   }, []);
+  if (!enabled) return null;
   return <canvas ref={canvasRef} aria-hidden className="absolute inset-0 z-0 h-full w-full pointer-events-none" />;
 }
 
@@ -611,6 +677,8 @@ function StyleBlock() {
 
       .cursia-root .marquee { animation: marquee 36s linear infinite; }
       @keyframes marquee { to { transform: translateX(-50%); } }
+      .cursia-root .marquee-rev { animation: marqueeRev 30s linear infinite; }
+      @keyframes marqueeRev { to { transform: translateX(-50%); } }
 
       .cursia-root .svc3d { touch-action: pan-y; }
 
@@ -618,8 +686,15 @@ function StyleBlock() {
       .cursia-root .orbit-ring { transform: translate(-50%,-50%); animation: orbitSpin 70s linear infinite; }
       .cursia-root .orbit-ring-rev { transform: translate(-50%,-50%); animation: orbitSpin 55s linear infinite reverse; }
       @keyframes orbitSpin { from { transform: translate(-50%,-50%) rotate(0); } to { transform: translate(-50%,-50%) rotate(360deg); } }
-      .cursia-root .node { transform: translate(-50%,-50%); animation: nodeFloat 5.5s ease-in-out infinite; will-change: transform; }
+      .cursia-root .node { transform: translate(-50%,-50%); animation: nodeFloat 5.5s ease-in-out infinite; will-change: transform; cursor: pointer; }
       @keyframes nodeFloat { 0%,100% { transform: translate(-50%,-50%); } 50% { transform: translate(-50%, calc(-50% - 8px)); } }
+      .cursia-root .node:hover { z-index: 30; animation-play-state: paused; }
+      .cursia-root .nicon { transition: transform .4s cubic-bezier(.16,1,.3,1), box-shadow .4s ease; }
+      .cursia-root .node:hover .nicon, .cursia-root .node:focus-visible .nicon { transform: scale(1.65); box-shadow: 0 0 0 4px var(--gsoft), 0 0 26px 5px var(--g1), 0 0 60px 18px var(--gsoft); }
+      .cursia-root .nlabel { transition: background .3s ease, color .3s ease, box-shadow .3s ease; }
+      .cursia-root .node:hover .nlabel, .cursia-root .node:focus-visible .nlabel { background: var(--g1); color: #fff; box-shadow: 0 12px 26px -10px var(--g1); }
+      .cursia-root .nlabel-arrow { max-width: 0; opacity: 0; overflow: hidden; transition: max-width .3s ease, opacity .3s ease; }
+      .cursia-root .node:hover .nlabel-arrow, .cursia-root .node:focus-visible .nlabel-arrow { max-width: 14px; opacity: 1; }
       .cursia-root .cline { animation: clineDash 1.6s linear infinite; }
       @keyframes clineDash { to { stroke-dashoffset: -7; } }
       .cursia-root .core-ping { background: radial-gradient(circle, rgba(124,58,237,0.4), transparent 70%); animation: corePulse 3.2s ease-in-out infinite; }
@@ -631,13 +706,15 @@ function StyleBlock() {
       .cursia-root .svc-glow { opacity: .45; animation: glowPulse 5s ease-in-out infinite; }
       .cursia-root .svc-card:hover .svc-glow { opacity: .85; }
       @keyframes glowPulse { 0%,100% { opacity: .4; transform: scale(1); } 50% { opacity: .72; transform: scale(1.14); } }
+      /* Evita glitch de repintado del contenido en móvil (preserve-3d + overflow) */
+      .cursia-root .svc-card { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
 
       .cursia-root .rail { scrollbar-width: none; -ms-overflow-style: none; }
       .cursia-root .rail::-webkit-scrollbar { display: none; }
 
       @media (prefers-reduced-motion: reduce) {
         .cursia-root .reveal { opacity: 1; transform: none; }
-        .cursia-root .parallax-card, .cursia-root .marquee, .cursia-root .grad-text,
+        .cursia-root .parallax-card, .cursia-root .marquee, .cursia-root .marquee-rev, .cursia-root .grad-text,
         .cursia-root .svc-spine, .cursia-root .svc-glow,
         .cursia-root .orbit-ring, .cursia-root .orbit-ring-rev, .cursia-root .node,
         .cursia-root .cline, .cursia-root .core-ping { animation: none !important; }
