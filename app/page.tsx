@@ -6,8 +6,6 @@
  * blanco + azul #0066FF primario + violeta #7C3AED acento + verde validación.
  * Funnel: atención → consideración → prueba social → conversión.
  * La landing anterior quedó archivada en /anterior.
- *
- * NOTA: las reseñas son PLACEHOLDERS EDITABLES. Reemplazar por testimonios reales.
  */
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
@@ -60,12 +58,10 @@ function onCardMouseMove(e: React.MouseEvent<HTMLElement>) {
 
 /* ── Reseñas — PLACEHOLDERS EDITABLES ─────────────────────────────────────── */
 const REVIEWS = [
-  { quote: "El reporte nos mostró exactamente dónde estaba el vacío de conocimiento. Capacitamos con foco y el cambio fue medible en semanas.", role: "Dirección de Talento Humano", org: "Sector financiero" },
-  { quote: "Por fin un curso que no se puede 'pasar' copiando. Las preguntas abiertas con IA nos dieron una certificación en la que confiamos.", role: "Jefatura de Operaciones", org: "Manufactura" },
-  { quote: "El agente sobre nuestros manuales le ahorra horas al equipo cada semana. Responde al instante y siempre cita la fuente.", role: "Líder de L&D", org: "Retail" },
-  { quote: "La nueva página web cambió por completo cómo nos perciben los clientes. Se siente premium y carga al instante.", role: "Gerencia de Marketing", org: "Servicios B2B" },
-  { quote: "La auditoría de procesos destapó cuellos de botella que llevábamos años arrastrando. El plan fue claro y accionable.", role: "Dirección de Operaciones", org: "Logística" },
-  { quote: "Montaron mi funnel y mis cursos llave en mano. Pasé de improvisar a tener una marca que vende sola.", role: "Creador de contenido", org: "Educación online" },
+  { quote: "Cursia nos creó un curso de servicio al cliente hecho a la medida de cómo trabajamos. Nos ayudó muchísimo: el equipo atiende con más criterio y los clientes lo notan.", role: "Alexander Valencia", org: "Equipo de atención al cliente" },
+  { quote: "En el colegio implementamos un curso de inteligencia artificial para los trabajadores y el resultado fue muy bueno. Hoy usan estas herramientas en su día a día con total naturalidad.", role: "Adriana Fontán", org: "Colegio Fontán" },
+  { quote: "Me crearon una página web preciosa para mostrar mi trabajo de edición. Quedé feliz con el resultado, y ahora estamos armando juntos el curso.", role: "Valentina Tovar", org: "Editora audiovisual" },
+  { quote: "Antes mostraba mi empresa de reprogramación de vehículos solo por redes sociales. Me hicieron la página web muy rápido y quedó exactamente como la quería. Cien por ciento recomendados.", role: "Juan José Ochoa", org: "Reprogramación de vehículos" },
 ] as const;
 
 /* ── Nodos de la constelación del hero (5 servicios alrededor del núcleo) ──── */
@@ -88,7 +84,6 @@ export default function ReinventionLanding() {
   useScrollReveal();
   const [scrolled, setScrolled] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
-  const reviewsRail = useRef<HTMLDivElement>(null);
 
   // Coverflow 3D de servicios (manual, giratorio infinito)
   const [activeSvc, setActiveSvc] = useState(0);
@@ -136,12 +131,6 @@ export default function ReinventionLanding() {
     };
     hero.addEventListener("mousemove", onMove);
     return () => { hero.removeEventListener("mousemove", onMove); cancelAnimationFrame(raf); };
-  }, []);
-
-  const slide = useCallback((ref: React.RefObject<HTMLDivElement | null>, dir: number) => {
-    const rail = ref.current;
-    if (!rail) return;
-    rail.scrollBy({ left: dir * (rail.clientWidth * 0.8), behavior: "smooth" });
   }, []);
 
   return (
@@ -426,33 +415,22 @@ export default function ReinventionLanding() {
         </div>
       </section>
 
-      {/* ── RESEÑAS (slider) ── */}
+      {/* ── RESEÑAS (grilla estática) ── */}
       <section id="resenas" className="relative z-10 px-6 pt-24 sm:pt-28 pb-10">
         <div className="max-w-6xl mx-auto">
-          <div data-reveal className="reveal flex flex-wrap items-end justify-between gap-6">
-            <div className="max-w-2xl">
-              <span className="text-xs font-bold uppercase tracking-[0.25em] text-[#7C3AED]">Reseñas</span>
-              <h2 className="font-headline font-extrabold tracking-tight mt-4 text-[clamp(2rem,5vw,3.2rem)] leading-[1.05]">
-                Lo que dicen <span className="grad-text">los equipos.</span>
-              </h2>
-              <p className="mt-3 text-xs text-[#424656]/70 italic">* Reseñas de ejemplo — reemplazar por testimonios reales.</p>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => slide(reviewsRail, -1)} aria-label="Anterior" className="flex h-12 w-12 items-center justify-center rounded-full border border-black/[0.08] bg-white text-[#191C1E] hover:border-[#0066FF]/40 hover:text-[#0066FF] transition-all">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <button onClick={() => slide(reviewsRail, 1)} aria-label="Siguiente" className="flex h-12 w-12 items-center justify-center rounded-full border border-black/[0.08] bg-white text-[#191C1E] hover:border-[#0066FF]/40 hover:text-[#0066FF] transition-all">
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
+          <div data-reveal className="reveal max-w-2xl">
+            <span className="text-xs font-bold uppercase tracking-[0.25em] text-[#7C3AED]">Reseñas</span>
+            <h2 className="font-headline font-extrabold tracking-tight mt-4 text-[clamp(2rem,5vw,3.2rem)] leading-[1.05]">
+              Lo que dicen <span className="grad-text">los equipos.</span>
+            </h2>
           </div>
 
-          <div ref={reviewsRail} className="rail mt-12 flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory">
+          <div data-reveal className="reveal mt-12 grid gap-5 sm:grid-cols-2">
             {REVIEWS.map((r, i) => (
               <figure
                 key={i}
                 onMouseMove={onCardMouseMove}
-                className="review-card spotlight-card group relative shrink-0 snap-start w-[85%] sm:w-[360px] overflow-hidden rounded-3xl border border-[#7C3AED]/15 p-7 shadow-[0_30px_70px_-38px_rgba(124,58,237,0.5)] transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_44px_100px_-44px_rgba(124,58,237,0.6)] hover:border-[#7C3AED]/30"
+                className="review-card spotlight-card group relative overflow-hidden rounded-3xl border border-[#7C3AED]/15 p-7 shadow-[0_30px_70px_-38px_rgba(124,58,237,0.5)] transition-all duration-500 hover:-translate-y-1.5 hover:shadow-[0_44px_100px_-44px_rgba(124,58,237,0.6)] hover:border-[#7C3AED]/30"
                 style={{ background: "linear-gradient(160deg, #FFFFFF 0%, #F4F1FF 100%)", ["--spot" as string]: "rgba(124,58,237,0.16)" }}
               >
                 <div className="flex items-center justify-between">
