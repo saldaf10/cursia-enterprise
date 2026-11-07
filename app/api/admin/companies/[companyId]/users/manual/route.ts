@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { emailEq, normEmail } from "@/lib/email";
 import { auth } from "@/lib/auth";
 
 export async function POST(
@@ -25,11 +26,11 @@ export async function POST(
       );
     }
 
-    const trimmedEmail = String(email).trim();
+    const trimmedEmail = normEmail(String(email));
 
     // Check if user already exists
-    const existingUser = await prisma.preRegisteredUser.findUnique({
-      where: { email: trimmedEmail },
+    const existingUser = await prisma.preRegisteredUser.findFirst({
+      where: { email: emailEq(trimmedEmail) },
     });
 
     if (existingUser) {

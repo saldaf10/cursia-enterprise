@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { emailEq, normEmail } from "@/lib/email";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { rateLimit } from "@/lib/rate-limit";
@@ -21,10 +22,11 @@ export async function POST(req: NextRequest) {
     }
 
     const json = await req.json();
-    const body = registerSchema.parse(json);
+    const parsed = registerSchema.parse(json);
+    const body = { ...parsed, email: normEmail(parsed.email) };
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: body.email },
+    const existingUser = await prisma.user.findFirst({
+      where: { email: emailEq(body.email) },
     });
 
     if (existingUser) {
@@ -34,14 +36,14 @@ export async function POST(req: NextRequest) {
     const hashedPassword = await bcrypt.hash(body.password, 10);
 
     // Check for pre-registration
-    const preRegistered = await prisma.preRegisteredUser.findUnique({
-      where: { email: body.email },
+    const preRegistered = await prisma.preRegisteredUser.findFirst({
+      where: { email: emailEq(body.email) },
       include: { contracts: { include: { courses: true } } },
     });
 
     // Check for pending contract admin invites
     const pendingContracts = await prisma.contract.findMany({
-      where: { adminEmail: body.email },
+      where: { adminEmail: emailEq(body.email) },
     });
 
     if (!preRegistered && pendingContracts.length === 0) {
@@ -86,7 +88,7 @@ export async function POST(req: NextRequest) {
 
       // Link user to these contracts
       await prisma.contract.updateMany({
-        where: { adminEmail: body.email },
+        where: { adminEmail: emailEq(body.email) },
         data: { adminId: user.id },
       });
     }

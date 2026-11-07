@@ -39,10 +39,13 @@ export default function ServiceDetailPage() {
 
       {/* Nav simple */}
       <header className="fixed top-4 inset-x-0 z-50 flex justify-center px-4">
-        <nav className="flex items-center gap-6 rounded-full border border-black/[0.05] bg-white/80 backdrop-blur-xl px-6 py-2.5 shadow-[0_10px_40px_-18px_rgba(2,12,40,0.35)]">
+        <nav className="flex items-center gap-3 sm:gap-6 rounded-full border border-black/[0.05] bg-white/80 backdrop-blur-xl px-4 sm:px-6 py-2.5 shadow-[0_10px_40px_-18px_rgba(2,12,40,0.35)]">
           <Link href="/" className="font-headline font-extrabold text-lg tracking-tight">Curs<span className="text-[#0066FF]">ia</span></Link>
           <Link href="/#servicios" className="hidden sm:inline-flex items-center gap-1.5 text-sm text-[#424656] hover:text-[#0066FF] transition-colors">
             <ArrowLeft className="w-4 h-4" /> Todos los servicios
+          </Link>
+          <Link href="/auth/signin" className="inline-flex items-center rounded-full border border-black/10 bg-white/70 px-4 py-2 text-sm font-semibold text-[#191C1E] hover:border-[#0066FF] hover:text-[#0066FF] transition-colors">
+            Ingresar
           </Link>
           <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[#0066FF] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0052cc] transition-all">
             Hablemos <ArrowRight className="w-4 h-4" />

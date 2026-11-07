@@ -173,7 +173,10 @@ export default function ReinventionLanding() {
             <a href="#proceso" className="hover:text-[#0066FF] transition-colors">Proceso</a>
             <a href="#resenas" className="hover:text-[#0066FF] transition-colors">Reseñas</a>
           </div>
-          <a href="#contacto" className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-[#0066FF] px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(0,102,255,0.7)] hover:bg-[#0052cc] transition-all">
+          <Link href="/auth/signin" className="ml-1 inline-flex items-center rounded-full border border-black/10 bg-white/70 px-4 py-2 text-sm font-semibold text-[#191C1E] hover:border-[#0066FF] hover:text-[#0066FF] transition-colors">
+            Ingresar
+          </Link>
+          <a href="#contacto" className="inline-flex items-center gap-1.5 rounded-full bg-[#0066FF] px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_24px_-8px_rgba(0,102,255,0.7)] hover:bg-[#0052cc] transition-all">
             Hablemos <ArrowRight className="w-4 h-4" />
           </a>
         </nav>
