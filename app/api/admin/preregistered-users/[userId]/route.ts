@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { emailEq, normEmail } from "@/lib/email";
 import { auth } from "@/lib/auth";
 
 export async function PATCH(
@@ -13,7 +14,8 @@ export async function PATCH(
 
   const { userId } = await params;
   const body = await req.json();
-  const { name, email, nationalId } = body;
+  const { name, nationalId } = body;
+  const email = typeof body.email === "string" ? normEmail(body.email) : body.email;
 
   try {
     const preReg = await prisma.preRegisteredUser.findUnique({
@@ -37,7 +39,7 @@ export async function PATCH(
     // so the certificate reflects the change immediately
     if (preReg.isRegistered) {
       const registeredUser = await prisma.user.findFirst({
-        where: { email: preReg.email },
+        where: { email: emailEq(preReg.email) },
       });
 
       if (registeredUser) {

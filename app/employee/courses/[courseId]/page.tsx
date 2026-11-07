@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { emailEq } from "@/lib/email";
 import { auth } from "@/lib/auth";
 import { CoursePlayer } from "@/components/employee/course-player";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,7 +78,7 @@ export default async function CoursePage({
         {
           OR: [
             { users: { some: { id: session.user.id } } },
-            { preRegisteredUsers: { some: { email: session.user.email } } },
+            { preRegisteredUsers: { some: { email: emailEq(session.user.email ?? "") } } },
           ],
         },
         { courses: { some: { id: courseId } } },

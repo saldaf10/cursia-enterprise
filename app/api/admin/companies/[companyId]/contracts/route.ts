@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { emailEq, normEmail } from "@/lib/email";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 
@@ -32,7 +33,8 @@ export async function POST(
       return new NextResponse(JSON.stringify(result.error.issues), { status: 400 });
     }
 
-    const { startDate, endDate, status, documentUrl, courseIds, adminEmail, maxUsers } = result.data;
+    const { startDate, endDate, status, documentUrl, courseIds, maxUsers } = result.data;
+    const adminEmail = result.data.adminEmail ? normEmail(result.data.adminEmail) : undefined;
 
     // Normalize dates
     startDate.setHours(0, 0, 0, 0);
@@ -43,8 +45,8 @@ export async function POST(
     let adminId: string | undefined;
 
     if (adminEmail) {
-      const adminUser = await prisma.user.findUnique({
-        where: { email: adminEmail },
+      const adminUser = await prisma.user.findFirst({
+        where: { email: emailEq(adminEmail) },
       });
       if (adminUser) {
         adminId = adminUser.id;

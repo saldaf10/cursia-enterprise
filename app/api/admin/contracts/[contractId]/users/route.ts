@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { emailEq } from "@/lib/email";
 import { auth } from "@/lib/auth";
 import { z } from "zod";
 
@@ -102,8 +103,8 @@ export async function POST(
 
       for (const preUser of preRegisteredUsers) {
         if (preUser.isRegistered || preUser.email) {
-          const user = await prisma.user.findUnique({
-            where: { email: preUser.email },
+          const user = await prisma.user.findFirst({
+            where: { email: emailEq(preUser.email) },
           });
 
           if (user) {

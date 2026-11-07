@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { emailEq, normEmail } from "@/lib/email";
 import { auth } from "@/lib/auth";
 import * as XLSX from "xlsx";
 
@@ -64,21 +65,29 @@ export async function POST(
       }
 
       try {
-        await prisma.preRegisteredUser.upsert({
-          where: { email: String(email).trim() },
-          update: {
-            name: name ? String(name).trim() : undefined,
-            nationalId: cedula ? String(cedula).trim() : undefined,
-            companyId,
-          },
-          create: {
-            email: String(email).trim(),
-            name: name ? String(name).trim() : undefined,
-            nationalId: cedula ? String(cedula).trim() : undefined,
-            companyId,
-            isRegistered: false,
-          },
+        const existing = await prisma.preRegisteredUser.findFirst({
+          where: { email: emailEq(String(email)) },
         });
+        if (existing) {
+          await prisma.preRegisteredUser.update({
+            where: { id: existing.id },
+            data: {
+              name: name ? String(name).trim() : undefined,
+              nationalId: cedula ? String(cedula).trim() : undefined,
+              companyId,
+            },
+          });
+        } else {
+          await prisma.preRegisteredUser.create({
+            data: {
+              email: normEmail(String(email)),
+              name: name ? String(name).trim() : undefined,
+              nationalId: cedula ? String(cedula).trim() : undefined,
+              companyId,
+              isRegistered: false,
+            },
+          });
+        }
         results.success++;
       } catch (e) {
         results.errors.push(`Error procesando ${email}: ${e}`);

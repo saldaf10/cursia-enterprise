@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { emailEq } from "@/lib/email";
 import { auth } from "@/lib/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export default async function EmployeeDashboard() {
         {
           OR: [
             { users: { some: { id: session.user.id } } },
-            { preRegisteredUsers: { some: { email: session.user.email } } },
+            { preRegisteredUsers: { some: { email: emailEq(session.user.email ?? "") } } },
           ],
         },
         { status: "ACTIVE" },
